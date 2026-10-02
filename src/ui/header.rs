@@ -44,6 +44,13 @@ pub fn render_header(
                 .fg(Color::Black)
                 .add_modifier(Modifier::BOLD),
         ),
+        PlaybackStatus::Replaying => Span::styled(
+            " ▶ REPLAY CHECK ",
+            Style::default()
+                .bg(Theme::SECONDARY)
+                .fg(Color::Black)
+                .add_modifier(Modifier::BOLD),
+        ),
         PlaybackStatus::Paused => Span::styled(
             " ⏸ PAUSED ",
             Style::default()

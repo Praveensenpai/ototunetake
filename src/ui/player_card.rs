@@ -1,5 +1,5 @@
 use crate::domain::config::AppConfig;
-use crate::engine::player::{PlaybackStatus, ShadowPlayer};
+use crate::engine::player::ShadowPlayer;
 use crate::engine::queue::SentenceQueue;
 use crate::ui::theme::Theme;
 use ratatui::{
@@ -108,42 +108,103 @@ fn render_sentence_text(
 }
 
 fn render_progress_bar(frame: &mut Frame, player: &ShadowPlayer, area: Rect) {
-    if let Some((elapsed, total)) = player.gap_progress() {
-        let ratio = if total.as_secs_f32() > 0.0 {
-            (elapsed.as_secs_f32() / total.as_secs_f32()).clamp(0.0, 1.0)
-        } else {
-            0.0
-        };
-        let label = format!(
-            "Shadow Gap: {:.1}s / {:.1}s",
-            elapsed.as_secs_f32(),
-            total.as_secs_f32()
-        );
-        let gauge = Gauge::default()
-            .gauge_style(
-                Style::default()
-                    .fg(Theme::ACCENT)
-                    .bg(Color::Rgb(60, 60, 70)),
-            )
-            .ratio(ratio as f64)
-            .label(label);
-        frame.render_widget(gauge, area);
-    } else {
-        let elapsed = player.audio().elapsed();
-        let label = match player.status() {
-            PlaybackStatus::Playing => format!("▶ Reference Audio: {:.1}s", elapsed.as_secs_f32()),
-            PlaybackStatus::Paused => format!("⏸ Paused at: {:.1}s", elapsed.as_secs_f32()),
-            _ => "Audio ready".to_string(),
-        };
-        let gauge = Gauge::default()
-            .gauge_style(
-                Style::default()
-                    .fg(Theme::PRIMARY)
-                    .bg(Color::Rgb(60, 60, 70)),
-            )
-            .percent(if player.audio().is_playing() { 100 } else { 0 })
-            .label(label);
-        frame.render_widget(gauge, area);
+    match player.phase() {
+        crate::engine::player::ShadowLoopPhase::ShadowGap {
+            start, duration, ..
+        } => {
+            let elapsed = start.elapsed().min(*duration);
+            let ratio = if duration.as_secs_f32() > 0.0 {
+                (elapsed.as_secs_f32() / duration.as_secs_f32()).clamp(0.0, 1.0)
+            } else {
+                0.0
+            };
+            let label = format!(
+                "🗣 Your Turn (Shadow): {:.1}s / {:.1}s",
+                elapsed.as_secs_f32(),
+                duration.as_secs_f32()
+            );
+            let gauge = Gauge::default()
+                .gauge_style(
+                    Style::default()
+                        .fg(Theme::ACCENT)
+                        .bg(Color::Rgb(60, 60, 70)),
+                )
+                .ratio(ratio as f64)
+                .label(label);
+            frame.render_widget(gauge, area);
+        }
+        crate::engine::player::ShadowLoopPhase::PostReplayGap {
+            start, duration, ..
+        } => {
+            let elapsed = start.elapsed().min(*duration);
+            let ratio = if duration.as_secs_f32() > 0.0 {
+                (elapsed.as_secs_f32() / duration.as_secs_f32()).clamp(0.0, 1.0)
+            } else {
+                0.0
+            };
+            let label = format!(
+                "⏸ Next In: {:.1}s / {:.1}s",
+                elapsed.as_secs_f32(),
+                duration.as_secs_f32()
+            );
+            let gauge = Gauge::default()
+                .gauge_style(Style::default().fg(Theme::MUTED).bg(Color::Rgb(60, 60, 70)))
+                .ratio(ratio as f64)
+                .label(label);
+            frame.render_widget(gauge, area);
+        }
+        crate::engine::player::ShadowLoopPhase::PlayingReference { .. } => {
+            let elapsed = player.audio().elapsed().as_secs_f32();
+            let total = player.audio().duration().as_secs_f32();
+            let ratio = player.audio().progress_ratio();
+            let label = format!("▶ Reference Audio: {:.1}s / {:.1}s", elapsed, total);
+            let gauge = Gauge::default()
+                .gauge_style(
+                    Style::default()
+                        .fg(Theme::PRIMARY)
+                        .bg(Color::Rgb(60, 60, 70)),
+                )
+                .ratio(ratio)
+                .label(label);
+            frame.render_widget(gauge, area);
+        }
+        crate::engine::player::ShadowLoopPhase::PlayingReplay { .. } => {
+            let elapsed = player.audio().elapsed().as_secs_f32();
+            let total = player.audio().duration().as_secs_f32();
+            let ratio = player.audio().progress_ratio();
+            let label = format!("▶ Replay Check: {:.1}s / {:.1}s", elapsed, total);
+            let gauge = Gauge::default()
+                .gauge_style(
+                    Style::default()
+                        .fg(Theme::SECONDARY)
+                        .bg(Color::Rgb(60, 60, 70)),
+                )
+                .ratio(ratio)
+                .label(label);
+            frame.render_widget(gauge, area);
+        }
+        crate::engine::player::ShadowLoopPhase::Paused { .. } => {
+            let elapsed = player.audio().elapsed().as_secs_f32();
+            let total = player.audio().duration().as_secs_f32();
+            let ratio = player.audio().progress_ratio();
+            let label = format!("⏸ Paused at: {:.1}s / {:.1}s", elapsed, total);
+            let gauge = Gauge::default()
+                .gauge_style(
+                    Style::default()
+                        .fg(Theme::WARNING)
+                        .bg(Color::Rgb(60, 60, 70)),
+                )
+                .ratio(ratio)
+                .label(label);
+            frame.render_widget(gauge, area);
+        }
+        crate::engine::player::ShadowLoopPhase::Stopped => {
+            let gauge = Gauge::default()
+                .gauge_style(Style::default().fg(Theme::MUTED).bg(Color::Rgb(60, 60, 70)))
+                .percent(0)
+                .label("Audio Ready — Press [Space] to Play");
+            frame.render_widget(gauge, area);
+        }
     }
 }
 

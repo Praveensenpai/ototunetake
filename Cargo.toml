@@ -1,6 +1,6 @@
 [package]
 name = "ototunetake"
-version = "0.1.1"
+version = "0.1.2"
 edition = "2021"
 authors = ["Praveen Senpai"]
 description = "A dedicated Japanese Shadowing Player using Anki as the source of truth"

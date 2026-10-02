@@ -65,11 +65,11 @@ Sentence Entities (domain::Sentence)
   - `AnkiPaths`: `collection_db: PathBuf`, `media_dir: PathBuf`.
   - `AnkiScanner`: `locate_default_paths() -> Result<AnkiPaths>`, `open_read_only(db_path: &Path) -> Result<Connection>`, `scan_reviewed_sentences(paths: &AnkiPaths) -> Result<Vec<Sentence>>`.
 
-### `src/infra/audio.rs` (Role: infra, Lines: 207)
-- **Responsibility**: Native low-latency audio playback engine using `rodio` with lossless Opus/multi-codec fallback.
+### `src/infra/audio.rs` (Role: infra, Lines: 241)
+- **Responsibility**: Native low-latency audio playback engine using `rodio` with exact duration probing and lossless Opus/multi-codec fallback.
 - **Types**:
   - `AudioReader`: `File(BufReader<File>)`, `Memory(Cursor<Vec<u8>>)`.
-  - `AudioEngine`: `try_new() -> Result<Self>`, `play_file(path: &Path) -> Result<()>`, `toggle_pause()`, `is_playing() -> bool`, `is_paused() -> bool`, `is_done() -> bool`, `stop()`, `set_volume(vol: f32)`, `volume() -> f32`, `elapsed() -> Duration`.
+  - `AudioEngine`: `try_new() -> Result<Self>`, `play_file(path: &Path) -> Result<()>`, `toggle_pause()`, `is_playing() -> bool`, `is_paused() -> bool`, `is_done() -> bool`, `stop()`, `set_volume(vol: f32)`, `volume() -> f32`, `duration() -> Duration`, `progress_ratio() -> f64`, `elapsed() -> Duration`.
 
 ### `src/infra/storage.rs` (Role: infra, Lines: 102)
 - **Responsibility**: Filesystem persistence for config, stats, and session state.
@@ -82,22 +82,22 @@ Sentence Entities (domain::Sentence)
 - **Types**:
   - `SentenceQueue`: `new(pool: Vec<Sentence>) -> Self`, `current()`, `advance()`, `previous()`, `jump_to()`, `toggle_shuffle()`, `set_filter()`, `remove_at()`.
 
-### `src/engine/player.rs` (Role: engine, Lines: 268)
-- **Responsibility**: Shadowing loop state machine and repetition controller.
+### `src/engine/player.rs` (Role: engine, Lines: 295)
+- **Responsibility**: Multi-phase Shadowing loop state machine and repetition controller.
 - **Types**:
-  - `PlaybackStatus`: `Playing`, `Paused`, `WaitingGap`, `Stopped`.
-  - `ShadowLoopPhase`: `Stopped`, `PlayingReference`, `ShadowGap`, `PostReplayGap`, `Paused`.
-  - `ShadowPlayer`: `new()`, `status()`, `current_repetition()`, `gap_progress()`, `play_current()`, `toggle_play()`, `replay()`, `next()`, `previous()`, `tick()`.
+  - `PlaybackStatus`: `Playing`, `Replaying`, `Paused`, `WaitingGap`, `Stopped`.
+  - `ShadowLoopPhase`: `Stopped`, `PlayingReference`, `ShadowGap`, `PlayingReplay`, `PostReplayGap`, `Paused`.
+  - `ShadowPlayer`: `new()`, `phase()`, `status()`, `current_repetition()`, `play_current()`, `toggle_play()`, `replay()`, `next()`, `previous()`, `tick()`.
 
-### `src/input.rs` (Role: ui/input, Lines: 200)
-- **Responsibility**: Keyboard event dispatcher and modal input handlers.
+### `src/input.rs` (Role: ui/input, Lines: 216)
+- **Responsibility**: Keyboard event dispatcher and modal input handlers with non-crashing status notifications.
 - **Functions**: `handle_key_event`, `handle_search_key`, `handle_playlist_key`.
 
 ### `src/ui/` (Role: ui)
 - `theme.rs` (Lines: 13): Pastel palette matching Ototune aesthetic.
 - `layout.rs` (Lines: 70): Split layout and bottom keybinding hints.
-- `header.rs` (Lines: 125): Header with playback badges, preset status, repetition counter, and today's stats.
-- `player_card.rs` (Lines: 197): Audio-first sentence display, gauge progress, card review metadata.
+- `header.rs` (Lines: 132): Header with playback badges, preset status, repetition counter, and today's stats.
+- `player_card.rs` (Lines: 258): Audio-first sentence display, phase-aware gauge progress with live timing, card review metadata.
 - `queue_view.rs` (Lines: 77): Upcoming queue list and active item highlight.
 - `modals.rs` (Lines: 242): Help modal (`?`), playlist selector (`P`), live search bar (`/`).
 

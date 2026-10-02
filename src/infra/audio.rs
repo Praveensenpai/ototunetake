@@ -40,6 +40,7 @@ pub struct AudioEngine {
     pause_start: Option<Instant>,
     is_paused: Arc<AtomicBool>,
     volume: f32,
+    duration: Duration,
     cached_wav: Option<(PathBuf, Vec<u8>)>,
 }
 
@@ -57,6 +58,7 @@ impl AudioEngine {
             pause_start: None,
             is_paused: Arc::new(AtomicBool::new(false)),
             volume: 1.0,
+            duration: Duration::from_secs(1),
             cached_wav: None,
         })
     }
@@ -64,6 +66,7 @@ impl AudioEngine {
     pub fn play_file(&mut self, path: &Path) -> Result<()> {
         self.stop();
 
+        self.duration = Self::probe_duration(path).unwrap_or(Duration::from_millis(1500));
         let source = self.create_source(path)?;
         let sink = Sink::try_new(&self.stream_handle)
             .map_err(|e| AppError::Audio(format!("Failed to create audio sink: {e}")))?;
@@ -78,6 +81,24 @@ impl AudioEngine {
         self.is_paused.store(false, Ordering::SeqCst);
 
         Ok(())
+    }
+
+    fn probe_duration(path: &Path) -> Option<Duration> {
+        let output = Command::new("ffprobe")
+            .args([
+                "-v",
+                "error",
+                "-show_entries",
+                "format=duration",
+                "-of",
+                "default=noprint_wrappers=1:nokey=1",
+            ])
+            .arg(path)
+            .output()
+            .ok()?;
+        let text = String::from_utf8_lossy(&output.stdout);
+        let secs = text.trim().parse::<f32>().ok()?;
+        Some(Duration::from_secs_f32(secs))
     }
 
     fn create_source(&mut self, path: &Path) -> Result<Decoder<AudioReader>> {
@@ -185,6 +206,19 @@ impl AudioEngine {
 
     pub fn volume(&self) -> f32 {
         self.volume
+    }
+
+    pub fn duration(&self) -> Duration {
+        self.duration
+    }
+
+    pub fn progress_ratio(&self) -> f64 {
+        let total = self.duration.as_secs_f64();
+        if total > 0.0 {
+            (self.elapsed().as_secs_f64() / total).clamp(0.0, 1.0)
+        } else {
+            0.0
+        }
     }
 
     pub fn elapsed(&self) -> Duration {
