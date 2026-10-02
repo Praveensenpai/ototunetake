@@ -43,16 +43,18 @@ pub fn render_player_card(
         .direction(Direction::Vertical)
         .constraints([
             Constraint::Length(1), // Top spacing
-            Constraint::Min(4),    // Japanese sentence text & translation
+            Constraint::Min(3),    // Japanese sentence text & translation
             Constraint::Length(1), // Audio progress or Gap gauge
             Constraint::Length(1), // Spacing
-            Constraint::Length(3), // Card metadata (deck, tags, reps, interval)
+            Constraint::Length(2), // Active loop settings (Mode, Reps, Gap, Auto-Next)
+            Constraint::Length(2), // Card metadata (deck, tags, reps, interval)
         ])
         .split(inner);
 
     render_sentence_text(frame, sentence, config, card_chunks[1]);
     render_progress_bar(frame, player, card_chunks[2]);
-    render_metadata(frame, sentence, card_chunks[4]);
+    render_controls_helper(frame, config, card_chunks[4]);
+    render_metadata(frame, sentence, card_chunks[5]);
 }
 
 fn render_sentence_text(
@@ -220,39 +222,66 @@ fn render_metadata(frame: &mut Frame, sentence: &crate::domain::sentence::Senten
         ),
     ]);
 
-    let status_color = match sentence.status {
-        crate::domain::sentence::CardStatus::Mature => Theme::SUCCESS,
-        crate::domain::sentence::CardStatus::Young => Theme::WARNING,
-        _ => Theme::MUTED,
-    };
-
-    let line2 = Line::from(vec![
-        Span::styled("Status: ", Style::default().fg(Theme::MUTED)),
-        Span::styled(sentence.status.as_str(), Style::default().fg(status_color)),
-        Span::raw("  │  "),
-        Span::styled("Interval: ", Style::default().fg(Theme::MUTED)),
-        Span::styled(
-            format!("{}d", sentence.interval),
-            Style::default().fg(Theme::TEXT),
-        ),
-        Span::raw("  │  "),
-        Span::styled("Reps: ", Style::default().fg(Theme::MUTED)),
-        Span::styled(
-            format!("{}", sentence.reps),
-            Style::default().fg(Theme::TEXT),
-        ),
-        Span::raw("  │  "),
-        Span::styled(
-            format!(
-                "Played: {}x • Shadowed: {}x",
-                sentence.play_count, sentence.shadow_count
-            ),
-            Style::default().fg(Theme::MUTED),
-        ),
-    ]);
+    let stat_info = format!(
+        "Status: {} │ Ivl: {}d │ Reps: {} │ Played: {}x • Shadowed: {}x",
+        sentence.status.as_str(),
+        sentence.interval,
+        sentence.reps,
+        sentence.play_count,
+        sentence.shadow_count
+    );
+    let line2 = Line::from(Span::styled(stat_info, Style::default().fg(Theme::MUTED)));
 
     let p = Paragraph::new(vec![line1, line2])
         .alignment(Alignment::Center)
         .wrap(Wrap { trim: true });
+    frame.render_widget(p, area);
+}
+
+fn render_controls_helper(frame: &mut Frame, config: &AppConfig, area: Rect) {
+    let mode_desc = match config.preset {
+        crate::domain::config::PlaybackPreset::Shadow => "Listen → Shadow Gap → Replay Check",
+        crate::domain::config::PlaybackPreset::Repeat => "Listen → Silence Gap → Listen",
+        crate::domain::config::PlaybackPreset::Listen => "Continuous Native Audio (No Gaps)",
+    };
+
+    let line1 = Line::from(vec![
+        Span::styled(" Mode [m]: ", Style::default().fg(Theme::SECONDARY)),
+        Span::styled(
+            format!("{:<7} ", config.preset.name().to_uppercase()),
+            Style::default()
+                .fg(Theme::TEXT)
+                .add_modifier(Modifier::BOLD),
+        ),
+        Span::styled(format!("({mode_desc})"), Style::default().fg(Theme::MUTED)),
+    ]);
+
+    let rep_str = format!("{}x [keys 1-5]", config.repeat_count);
+    let gap_str = format!("{:.1}s [keys [/]]", config.shadow_gap_secs);
+    let adv_str = if config.auto_advance {
+        "ON [key a]"
+    } else {
+        "OFF (loop 1 sentence) [key a]"
+    };
+
+    let line2 = Line::from(vec![
+        Span::styled(" Reps: ", Style::default().fg(Theme::PRIMARY)),
+        Span::styled(rep_str, Style::default().fg(Theme::TEXT)),
+        Span::raw("   │   "),
+        Span::styled("Gap: ", Style::default().fg(Theme::WARNING)),
+        Span::styled(gap_str, Style::default().fg(Theme::TEXT)),
+        Span::raw("   │   "),
+        Span::styled("Auto-Advance: ", Style::default().fg(Theme::ACCENT)),
+        Span::styled(
+            adv_str,
+            Style::default().fg(if config.auto_advance {
+                Theme::SUCCESS
+            } else {
+                Theme::WARNING
+            }),
+        ),
+    ]);
+
+    let p = Paragraph::new(vec![line1, line2]).alignment(Alignment::Center);
     frame.render_widget(p, area);
 }

@@ -9,7 +9,7 @@ use ratatui::{
 };
 
 pub fn render_help_modal(frame: &mut Frame) {
-    let area = centered_rect(60, 70, frame.area());
+    let area = centered_rect(70, 80, frame.area());
     frame.render_widget(Clear, area);
 
     let block = Block::default()
@@ -17,7 +17,7 @@ pub fn render_help_modal(frame: &mut Frame) {
         .border_type(BorderType::Rounded)
         .border_style(Style::default().fg(Theme::PRIMARY))
         .title(Span::styled(
-            " ❓ Ototunetake Keybindings & Help ",
+            " ❓ Ototunetake Keybindings & Guide ",
             Style::default()
                 .fg(Theme::PRIMARY)
                 .add_modifier(Modifier::BOLD),
@@ -28,7 +28,7 @@ pub fn render_help_modal(frame: &mut Frame) {
 
     let help_lines = vec![
         Line::from(vec![Span::styled(
-            "Playback Controls:",
+            "Playback & Loop Controls:",
             Style::default()
                 .fg(Theme::SECONDARY)
                 .add_modifier(Modifier::BOLD),
@@ -36,7 +36,7 @@ pub fn render_help_modal(frame: &mut Frame) {
         Line::from(vec![
             Span::styled("  Space        ", Style::default().fg(Theme::PRIMARY)),
             Span::styled(
-                "Play / Pause reference audio & shadowing loop",
+                "Play / Pause audio & active shadowing loop",
                 Style::default().fg(Theme::TEXT),
             ),
         ]),
@@ -51,14 +51,35 @@ pub fn render_help_modal(frame: &mut Frame) {
         Line::from(vec![
             Span::styled("  r            ", Style::default().fg(Theme::PRIMARY)),
             Span::styled(
-                "Replay current reference audio",
+                "Replay current sentence from the beginning",
+                Style::default().fg(Theme::TEXT),
+            ),
+        ]),
+        Line::from(vec![
+            Span::styled("  1 - 5        ", Style::default().fg(Theme::PRIMARY)),
+            Span::styled(
+                "Set repeat count (repeats each sentence 1 to 5 times)",
+                Style::default().fg(Theme::TEXT),
+            ),
+        ]),
+        Line::from(vec![
+            Span::styled("  [ / ]        ", Style::default().fg(Theme::PRIMARY)),
+            Span::styled(
+                "Decrease / Increase shadow silence gap (-0.5s / +0.5s)",
+                Style::default().fg(Theme::TEXT),
+            ),
+        ]),
+        Line::from(vec![
+            Span::styled("  a            ", Style::default().fg(Theme::PRIMARY)),
+            Span::styled(
+                "Toggle Auto-Advance (ON = auto-next sentence, OFF = loop 1 sentence)",
                 Style::default().fg(Theme::TEXT),
             ),
         ]),
         Line::from(vec![
             Span::styled("  m / Tab      ", Style::default().fg(Theme::PRIMARY)),
             Span::styled(
-                "Cycle preset: [Listen] -> [Repeat] -> [Shadow]",
+                "Cycle preset: [Shadow] -> [Repeat] -> [Listen]",
                 Style::default().fg(Theme::TEXT),
             ),
         ]),
@@ -98,20 +119,6 @@ pub fn render_help_modal(frame: &mut Frame) {
             Span::styled("  e            ", Style::default().fg(Theme::ACCENT)),
             Span::styled(
                 "Toggle English translation display",
-                Style::default().fg(Theme::TEXT),
-            ),
-        ]),
-        Line::from(vec![
-            Span::styled("  [ / ]        ", Style::default().fg(Theme::ACCENT)),
-            Span::styled(
-                "Adjust shadowing gap duration (-0.5s / +0.5s)",
-                Style::default().fg(Theme::TEXT),
-            ),
-        ]),
-        Line::from(vec![
-            Span::styled("  1 - 5        ", Style::default().fg(Theme::ACCENT)),
-            Span::styled(
-                "Set repeat count (1 to 5 repetitions)",
                 Style::default().fg(Theme::TEXT),
             ),
         ]),
