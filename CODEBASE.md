@@ -65,9 +65,10 @@ Sentence Entities (domain::Sentence)
   - `AnkiPaths`: `collection_db: PathBuf`, `media_dir: PathBuf`.
   - `AnkiScanner`: `locate_default_paths() -> Result<AnkiPaths>`, `open_read_only(db_path: &Path) -> Result<Connection>`, `scan_reviewed_sentences(paths: &AnkiPaths) -> Result<Vec<Sentence>>`.
 
-### `src/infra/audio.rs` (Role: infra, Lines: 139)
-- **Responsibility**: Native low-latency audio playback engine using `rodio`.
+### `src/infra/audio.rs` (Role: infra, Lines: 207)
+- **Responsibility**: Native low-latency audio playback engine using `rodio` with lossless Opus/multi-codec fallback.
 - **Types**:
+  - `AudioReader`: `File(BufReader<File>)`, `Memory(Cursor<Vec<u8>>)`.
   - `AudioEngine`: `try_new() -> Result<Self>`, `play_file(path: &Path) -> Result<()>`, `toggle_pause()`, `is_playing() -> bool`, `is_paused() -> bool`, `is_done() -> bool`, `stop()`, `set_volume(vol: f32)`, `volume() -> f32`, `elapsed() -> Duration`.
 
 ### `src/infra/storage.rs` (Role: infra, Lines: 102)

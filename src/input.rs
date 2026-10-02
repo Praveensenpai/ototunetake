@@ -30,19 +30,27 @@ pub fn handle_key_event(
     match (key.modifiers, key.code) {
         (KeyModifiers::CONTROL, KeyCode::Char('c')) | (_, KeyCode::Char('q')) => Ok(true),
         (_, KeyCode::Char(' ')) => {
-            player.toggle_play(queue)?;
+            if let Err(e) = player.toggle_play(queue) {
+                ui_state.set_status(format!("Audio error: {e}"));
+            }
             Ok(false)
         }
         (_, KeyCode::Char('n')) | (_, KeyCode::Right) => {
-            player.next(queue)?;
+            if let Err(e) = player.next(queue) {
+                ui_state.set_status(format!("Audio error: {e}"));
+            }
             Ok(false)
         }
         (_, KeyCode::Char('p')) | (_, KeyCode::Left) => {
-            player.previous(queue)?;
+            if let Err(e) = player.previous(queue) {
+                ui_state.set_status(format!("Audio error: {e}"));
+            }
             Ok(false)
         }
         (_, KeyCode::Char('r')) => {
-            player.replay(queue)?;
+            if let Err(e) = player.replay(queue) {
+                ui_state.set_status(format!("Audio error: {e}"));
+            }
             Ok(false)
         }
         (_, KeyCode::Char('m')) | (_, KeyCode::Tab) => {

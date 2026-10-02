@@ -1,11 +1,35 @@
 use crate::error::{AppError, Result};
 use rodio::{Decoder, OutputStream, OutputStreamHandle, Sink};
 use std::fs::File;
-use std::io::BufReader;
-use std::path::Path;
+use std::io::{BufReader, Cursor, Read, Seek, SeekFrom};
+use std::path::{Path, PathBuf};
+use std::process::Command;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
+
+pub enum AudioReader {
+    File(BufReader<File>),
+    Memory(Cursor<Vec<u8>>),
+}
+
+impl Read for AudioReader {
+    fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
+        match self {
+            Self::File(r) => r.read(buf),
+            Self::Memory(c) => c.read(buf),
+        }
+    }
+}
+
+impl Seek for AudioReader {
+    fn seek(&mut self, pos: SeekFrom) -> std::io::Result<u64> {
+        match self {
+            Self::File(r) => r.seek(pos),
+            Self::Memory(c) => c.seek(pos),
+        }
+    }
+}
 
 pub struct AudioEngine {
     _stream: OutputStream,
@@ -16,6 +40,7 @@ pub struct AudioEngine {
     pause_start: Option<Instant>,
     is_paused: Arc<AtomicBool>,
     volume: f32,
+    cached_wav: Option<(PathBuf, Vec<u8>)>,
 }
 
 impl AudioEngine {
@@ -32,21 +57,14 @@ impl AudioEngine {
             pause_start: None,
             is_paused: Arc::new(AtomicBool::new(false)),
             volume: 1.0,
+            cached_wav: None,
         })
     }
 
     pub fn play_file(&mut self, path: &Path) -> Result<()> {
         self.stop();
 
-        let file = File::open(path)?;
-        let reader = BufReader::new(file);
-        let source = Decoder::new(reader).map_err(|e| {
-            AppError::Audio(format!(
-                "Failed to decode audio file {}: {e}",
-                path.display()
-            ))
-        })?;
-
+        let source = self.create_source(path)?;
         let sink = Sink::try_new(&self.stream_handle)
             .map_err(|e| AppError::Audio(format!("Failed to create audio sink: {e}")))?;
 
@@ -60,6 +78,56 @@ impl AudioEngine {
         self.is_paused.store(false, Ordering::SeqCst);
 
         Ok(())
+    }
+
+    fn create_source(&mut self, path: &Path) -> Result<Decoder<AudioReader>> {
+        if let Some((cached_path, wav_bytes)) = &self.cached_wav {
+            if cached_path == path {
+                let reader = AudioReader::Memory(Cursor::new(wav_bytes.clone()));
+                if let Ok(source) = Decoder::new(reader) {
+                    return Ok(source);
+                }
+            }
+        }
+
+        let file = File::open(path)?;
+        let direct_reader = AudioReader::File(BufReader::new(file));
+        if let Ok(source) = Decoder::new(direct_reader) {
+            return Ok(source);
+        }
+
+        let transcoded_bytes = Self::transcode_with_ffmpeg(path)?;
+        self.cached_wav = Some((path.to_path_buf(), transcoded_bytes.clone()));
+        let memory_reader = AudioReader::Memory(Cursor::new(transcoded_bytes));
+
+        Decoder::new(memory_reader).map_err(|e| {
+            AppError::Audio(format!(
+                "Failed to decode audio file {}: {e}",
+                path.display()
+            ))
+        })
+    }
+
+    fn transcode_with_ffmpeg(path: &Path) -> Result<Vec<u8>> {
+        let output = Command::new("ffmpeg")
+            .arg("-v")
+            .arg("error")
+            .arg("-i")
+            .arg(path)
+            .arg("-f")
+            .arg("flac")
+            .arg("-")
+            .output()?;
+
+        if !output.status.success() {
+            let err = String::from_utf8_lossy(&output.stderr);
+            return Err(AppError::Audio(format!(
+                "ffmpeg failed to decode {}: {err}",
+                path.display()
+            )));
+        }
+
+        Ok(output.stdout)
     }
 
     pub fn toggle_pause(&mut self) {

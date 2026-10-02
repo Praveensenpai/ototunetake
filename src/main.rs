@@ -191,7 +191,9 @@ fn main_loop(
             ui::render_app(f, player, queue, stats, player.config(), ui_state);
         })?;
 
-        player.tick(queue, stats)?;
+        if let Err(e) = player.tick(queue, stats) {
+            ui_state.set_status(format!("Audio error: {e}"));
+        }
 
         if event::poll(tick_rate)? {
             if let Event::Key(key) = event::read()? {
