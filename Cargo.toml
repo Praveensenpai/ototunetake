@@ -1,0 +1,24 @@
+[package]
+name = "ototunetake"
+version = "0.1.0"
+edition = "2021"
+authors = ["Praveen Senpai"]
+description = "A dedicated Japanese Shadowing Player using Anki as the source of truth"
+repository = "https://github.com/Praveensenpai/ototunetake"
+license = "MIT"
+keywords = ["japanese", "shadowing", "anki", "ratatui", "audio-player"]
+categories = ["command-line-utilities", "multimedia::audio"]
+
+[dependencies]
+ratatui = "0.29"
+crossterm = "0.28"
+rusqlite = { version = "0.32", features = ["bundled", "collation"] }
+rodio = { version = "0.19", default-features = true }
+clap = { version = "4", features = ["derive"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+thiserror = "1.0"
+unicode-width = "0.1"
+rand = "0.8"
+chrono = { version = "0.4", features = ["serde"] }
+directories = "5.0"

@@ -1,0 +1,197 @@
+use crate::domain::config::AppConfig;
+use crate::engine::player::{PlaybackStatus, ShadowPlayer};
+use crate::engine::queue::SentenceQueue;
+use crate::ui::theme::Theme;
+use ratatui::{
+    layout::{Alignment, Constraint, Direction, Layout, Rect},
+    style::{Color, Modifier, Style},
+    text::{Line, Span},
+    widgets::{Block, BorderType, Borders, Gauge, Paragraph, Wrap},
+    Frame,
+};
+
+pub fn render_player_card(
+    frame: &mut Frame,
+    player: &ShadowPlayer,
+    queue: &SentenceQueue,
+    config: &AppConfig,
+    area: Rect,
+) {
+    let block = Block::default()
+        .borders(Borders::ALL)
+        .border_type(BorderType::Rounded)
+        .border_style(Style::default().fg(Theme::SECONDARY))
+        .title(Span::styled(
+            " 🎧 Japanese Shadowing Player ",
+            Style::default()
+                .fg(Theme::SECONDARY)
+                .add_modifier(Modifier::BOLD),
+        ));
+
+    let inner = block.inner(area);
+    frame.render_widget(block, area);
+
+    let Some(sentence) = queue.current() else {
+        let empty_p = Paragraph::new("No sentence currently loaded. Check your playlist filter.")
+            .alignment(Alignment::Center)
+            .style(Style::default().fg(Theme::MUTED));
+        frame.render_widget(empty_p, inner);
+        return;
+    };
+
+    let card_chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([
+            Constraint::Length(1), // Top spacing
+            Constraint::Min(4),    // Japanese sentence text & translation
+            Constraint::Length(1), // Audio progress or Gap gauge
+            Constraint::Length(1), // Spacing
+            Constraint::Length(3), // Card metadata (deck, tags, reps, interval)
+        ])
+        .split(inner);
+
+    render_sentence_text(frame, sentence, config, card_chunks[1]);
+    render_progress_bar(frame, player, card_chunks[2]);
+    render_metadata(frame, sentence, card_chunks[4]);
+}
+
+fn render_sentence_text(
+    frame: &mut Frame,
+    sentence: &crate::domain::sentence::Sentence,
+    config: &AppConfig,
+    area: Rect,
+) {
+    let mut lines = Vec::new();
+
+    if config.show_japanese {
+        lines.push(Line::from(vec![Span::styled(
+            &sentence.japanese_text,
+            Style::default()
+                .fg(Theme::TEXT)
+                .add_modifier(Modifier::BOLD),
+        )]));
+
+        if config.show_furigana {
+            if let Some(furi) = &sentence.furigana {
+                lines.push(Line::from(vec![Span::styled(
+                    furi,
+                    Style::default().fg(Theme::MUTED),
+                )]));
+            }
+        }
+
+        if config.show_translation {
+            if let Some(trans) = &sentence.translation {
+                lines.push(Line::from(vec![Span::styled(
+                    trans,
+                    Style::default().fg(Theme::SECONDARY),
+                )]));
+            }
+        }
+    } else {
+        lines.push(Line::from(vec![Span::styled(
+            "🔊  [ Japanese Text Hidden — Audio-First Listening ]",
+            Style::default()
+                .fg(Theme::ACCENT)
+                .add_modifier(Modifier::BOLD),
+        )]));
+        lines.push(Line::from(vec![Span::styled(
+            "Press 't' to toggle sentence text, 'f' for furigana, 'e' for translation",
+            Style::default().fg(Theme::MUTED),
+        )]));
+    }
+
+    let p = Paragraph::new(lines)
+        .alignment(Alignment::Center)
+        .wrap(Wrap { trim: true });
+    frame.render_widget(p, area);
+}
+
+fn render_progress_bar(frame: &mut Frame, player: &ShadowPlayer, area: Rect) {
+    if let Some((elapsed, total)) = player.gap_progress() {
+        let ratio = if total.as_secs_f32() > 0.0 {
+            (elapsed.as_secs_f32() / total.as_secs_f32()).clamp(0.0, 1.0)
+        } else {
+            0.0
+        };
+        let label = format!(
+            "Shadow Gap: {:.1}s / {:.1}s",
+            elapsed.as_secs_f32(),
+            total.as_secs_f32()
+        );
+        let gauge = Gauge::default()
+            .gauge_style(
+                Style::default()
+                    .fg(Theme::ACCENT)
+                    .bg(Color::Rgb(60, 60, 70)),
+            )
+            .ratio(ratio as f64)
+            .label(label);
+        frame.render_widget(gauge, area);
+    } else {
+        let elapsed = player.audio().elapsed();
+        let label = match player.status() {
+            PlaybackStatus::Playing => format!("▶ Reference Audio: {:.1}s", elapsed.as_secs_f32()),
+            PlaybackStatus::Paused => format!("⏸ Paused at: {:.1}s", elapsed.as_secs_f32()),
+            _ => "Audio ready".to_string(),
+        };
+        let gauge = Gauge::default()
+            .gauge_style(
+                Style::default()
+                    .fg(Theme::PRIMARY)
+                    .bg(Color::Rgb(60, 60, 70)),
+            )
+            .percent(if player.audio().is_playing() { 100 } else { 0 })
+            .label(label);
+        frame.render_widget(gauge, area);
+    }
+}
+
+fn render_metadata(frame: &mut Frame, sentence: &crate::domain::sentence::Sentence, area: Rect) {
+    let line1 = Line::from(vec![
+        Span::styled("Deck: ", Style::default().fg(Theme::MUTED)),
+        Span::styled(&sentence.deck, Style::default().fg(Theme::TEXT)),
+        Span::raw("  │  "),
+        Span::styled("Tags: ", Style::default().fg(Theme::MUTED)),
+        Span::styled(
+            sentence.display_tags(),
+            Style::default().fg(Theme::SECONDARY),
+        ),
+    ]);
+
+    let status_color = match sentence.status {
+        crate::domain::sentence::CardStatus::Mature => Theme::SUCCESS,
+        crate::domain::sentence::CardStatus::Young => Theme::WARNING,
+        _ => Theme::MUTED,
+    };
+
+    let line2 = Line::from(vec![
+        Span::styled("Status: ", Style::default().fg(Theme::MUTED)),
+        Span::styled(sentence.status.as_str(), Style::default().fg(status_color)),
+        Span::raw("  │  "),
+        Span::styled("Interval: ", Style::default().fg(Theme::MUTED)),
+        Span::styled(
+            format!("{}d", sentence.interval),
+            Style::default().fg(Theme::TEXT),
+        ),
+        Span::raw("  │  "),
+        Span::styled("Reps: ", Style::default().fg(Theme::MUTED)),
+        Span::styled(
+            format!("{}", sentence.reps),
+            Style::default().fg(Theme::TEXT),
+        ),
+        Span::raw("  │  "),
+        Span::styled(
+            format!(
+                "Played: {}x • Shadowed: {}x",
+                sentence.play_count, sentence.shadow_count
+            ),
+            Style::default().fg(Theme::MUTED),
+        ),
+    ]);
+
+    let p = Paragraph::new(vec![line1, line2])
+        .alignment(Alignment::Center)
+        .wrap(Wrap { trim: true });
+    frame.render_widget(p, area);
+}
