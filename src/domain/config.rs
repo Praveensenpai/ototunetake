@@ -46,7 +46,7 @@ impl Default for AppConfig {
         Self {
             preset: PlaybackPreset::Shadow,
             repeat_count: 2,
-            shadow_gap_secs: 2.5,
+            shadow_gap_secs: 3.0,
             pause_after_replay_secs: 1.0,
             auto_advance: true,
             show_japanese: false,

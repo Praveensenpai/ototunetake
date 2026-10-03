@@ -109,7 +109,7 @@ pub fn handle_key_event(
         }
         (_, KeyCode::Char('[')) => {
             let cur = player.config().shadow_gap_secs;
-            player.config_mut().shadow_gap_secs = (cur - 0.5).max(0.5);
+            player.config_mut().shadow_gap_secs = (cur - 0.5).max(3.0);
             ui_state.set_status(format!(
                 "Shadow Gap: {:.1}s (decreased)",
                 player.config().shadow_gap_secs

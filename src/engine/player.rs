@@ -5,6 +5,8 @@ use crate::error::Result;
 use crate::infra::audio::AudioEngine;
 use std::time::{Duration, Instant};
 
+pub const MIN_SHADOW_GAP_SECS: f32 = 3.0;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PlaybackStatus {
     Playing,
@@ -198,7 +200,7 @@ impl ShadowPlayer {
         match self.config.preset {
             PlaybackPreset::Listen => self.finish_repetition_or_advance(repetition, queue, stats),
             PlaybackPreset::Repeat => {
-                let gap = Duration::from_secs_f32(self.config.shadow_gap_secs);
+                let gap = self.effective_shadow_gap();
                 self.phase = ShadowLoopPhase::PostReplayGap {
                     repetition,
                     start: Instant::now(),
@@ -207,7 +209,7 @@ impl ShadowPlayer {
                 Ok(())
             }
             PlaybackPreset::Shadow => {
-                let gap = Duration::from_secs_f32(self.config.shadow_gap_secs);
+                let gap = self.effective_shadow_gap();
                 self.phase = ShadowLoopPhase::ShadowGap {
                     repetition,
                     start: Instant::now(),
@@ -216,6 +218,13 @@ impl ShadowPlayer {
                 Ok(())
             }
         }
+    }
+
+    fn effective_shadow_gap(&self) -> Duration {
+        let min = Duration::from_secs_f32(MIN_SHADOW_GAP_SECS);
+        let configured = Duration::from_secs_f32(self.config.shadow_gap_secs);
+        let max = self.audio.duration().max(min);
+        configured.clamp(min, max)
     }
 
     fn start_replay(&mut self, repetition: u32, queue: &mut SentenceQueue) -> Result<()> {
