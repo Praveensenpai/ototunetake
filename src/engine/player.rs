@@ -220,11 +220,9 @@ impl ShadowPlayer {
         }
     }
 
-    fn effective_shadow_gap(&self) -> Duration {
+    pub fn effective_shadow_gap(&self) -> Duration {
         let min = Duration::from_secs_f32(MIN_SHADOW_GAP_SECS);
-        let configured = Duration::from_secs_f32(self.config.shadow_gap_secs);
-        let max = self.audio.duration().max(min);
-        configured.clamp(min, max)
+        self.audio.duration().max(min)
     }
 
     fn start_replay(&mut self, repetition: u32, queue: &mut SentenceQueue) -> Result<()> {

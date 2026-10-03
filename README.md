@@ -19,7 +19,7 @@
 ```text
 ┌────────────────────────────────────────────────────────────────────────┐
 │  🌸 Ototunetake ── Japanese Shadowing Player                           │
-│  Status: [ ▶ PLAYING ]   [SHADOW]   Rep 1/2  •  Gap: 2.5s  •  Vol: 100% │
+│  Status: [ ▶ PLAYING ]   [SHADOW]   Rep 1/2  •  Gap: 3.0s  •  Vol: 100% │
 │  Sentence 12 of 756 (All Reviewed)  │  Today: 42 sent (28m, 84 reps)   │
 ├────────────────────────────────────────┬───────────────────────────────┤
 │ 🎧 Japanese Shadowing Player           │ 📋 Queue  [SEQUENTIAL]        │
@@ -32,12 +32,12 @@
 │       ▶ Reference Audio: 0.8s / 1.6s   │    17. これはいくらですか？    │
 │                                        │    18. 駅はどこですか？        │
 │  Mode [m]: SHADOW (Listen → Gap → Repl)│    19. 日本語を勉強しています。 │
-│  Reps: 2x [keys 1-5] │ Gap: 2.5s [[/]] │    20. 今日は天気がいいね。    │
+│  Reps: 2x [keys 1-5] │ Gap: 3.0s (auto)│    20. 今日は天気がいいね。    │
 │  Deck: Ankidrone V7  │ Tags: jp1k      │                               │
 │  Status: Mature (49d)│ Reps: 14        │                               │
 ├────────────────────────────────────────┴───────────────────────────────┤
-│ [Space] Play  [1-5] Reps  [[ / ]] Gap  [m] Mode  [a] Auto-Adv  [t] Text │
-│ [n/p] Next/Prev  [r] Replay  [s] Shuffle  [P] Playlists  [/] Search    │
+│ [Space] Play  [1-5] Reps  [m] Mode  [a] Auto-Adv  [t] Text  [n/p] Nav   │
+│ [r] Replay  [s] Shuffle  [P] Playlists  [/] Search  [?] Help            │
 └────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -68,7 +68,7 @@ The ultimate deliberate practice loop for pitch accent and pronunciation:
 Native Audio (Listen) ──► Silence Gap (You Shadow) ──► Replay Audio (Self-Correction Check) ──► Repeat N times ──► Auto-Advance
 ```
 1. **Listen**: The native reference sentence audio plays once.
-2. **Shadow Gap**: A silence gap (default 2.5s, adjustable with `[` / `]`) begins, giving you time to repeat the sentence aloud.
+2. **Shadow Gap**: An automated silence gap (dynamically set to the reference audio length, minimum 3.0s) begins, giving you time to repeat the sentence aloud.
 3. **Replay Check**: The native reference audio automatically plays again so you can verify your pitch accent and pronunciation against the native speaker.
 4. **Repetition Loop**: Repeats this cycle $N$ times (configured via keys `1`–`5`) before auto-advancing to the next sentence.
 
@@ -94,9 +94,8 @@ The on-screen player card and footer show your live settings at a glance:
 
 - **Repetition Count (`1` – `5`)**:
   Press numbers `1`, `2`, `3`, `4`, or `5` to immediately change how many times each sentence is practiced before advancing.
-- **Shadow Gap Timing (`[` / `]`)**:
-  - Press `[` to decrease the speaking gap by `0.5s` (down to `0.5s`).
-  - Press `]` to increase the speaking gap by `0.5s` (up to `15.0s`).
+- **Adaptive Shadow Gap (Automatic)**:
+  Dynamically calculates the speaking silence gap based on sentence audio length (minimum `3.0s`), ensuring natural pacing without manual adjustment.
 - **Auto-Advance Toggle (`a`)**:
   - When **ON**, the player automatically transitions to the next sentence when repetitions finish.
   - When **OFF**, the player pauses after the current sentence so you can practice at your own pace.
@@ -160,7 +159,6 @@ install -m 755 target/release/ototunetake ~/.local/bin/ototunetake
 | :--- | :--- |
 | `Space` | Play / Pause audio & active loop |
 | `1` – `5` | Set repetitions per sentence (1x to 5x) |
-| `[` / `]` | Decrease / increase shadow silence gap ($\pm 0.5\text{s}$) |
 | `m` / `Tab` | Cycle playback mode (`[Shadow]` $\to$ `[Listen]` $\to$ `[Repeat]`) |
 | `a` | Toggle Auto-Advance on / off |
 | `t` | Toggle Japanese sentence text visibility (Audio-First Mode) |

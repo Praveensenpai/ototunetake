@@ -94,7 +94,7 @@ pub fn render_header(
         rep_span,
         Span::raw("  •  Gap: "),
         Span::styled(
-            format!("{:.1}s", player.config().shadow_gap_secs),
+            format!("{:.1}s", player.effective_shadow_gap().as_secs_f32()),
             Style::default().fg(Theme::WARNING),
         ),
         Span::raw("  •  Vol: "),

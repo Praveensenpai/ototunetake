@@ -46,8 +46,6 @@ pub fn render_footer(frame: &mut Frame, ui_state: &UiState, area: Rect) {
             Span::styled(" Play ", Style::default().fg(Theme::MUTED)),
             Span::styled(" [1-5]", Style::default().fg(Theme::PRIMARY)),
             Span::styled(" Reps ", Style::default().fg(Theme::MUTED)),
-            Span::styled(" [[ / ]]", Style::default().fg(Theme::PRIMARY)),
-            Span::styled(" Gap ", Style::default().fg(Theme::MUTED)),
             Span::styled(" [m]", Style::default().fg(Theme::SECONDARY)),
             Span::styled(" Mode ", Style::default().fg(Theme::MUTED)),
             Span::styled(" [a]", Style::default().fg(Theme::SECONDARY)),

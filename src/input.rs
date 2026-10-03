@@ -107,24 +107,6 @@ pub fn handle_key_event(
             ui_state.set_status(format!("Auto-advance: {status}"));
             Ok(false)
         }
-        (_, KeyCode::Char('[')) => {
-            let cur = player.config().shadow_gap_secs;
-            player.config_mut().shadow_gap_secs = (cur - 0.5).max(3.0);
-            ui_state.set_status(format!(
-                "Shadow Gap: {:.1}s (decreased)",
-                player.config().shadow_gap_secs
-            ));
-            Ok(false)
-        }
-        (_, KeyCode::Char(']')) => {
-            let cur = player.config().shadow_gap_secs;
-            player.config_mut().shadow_gap_secs = (cur + 0.5).min(15.0);
-            ui_state.set_status(format!(
-                "Shadow Gap: {:.1}s (increased)",
-                player.config().shadow_gap_secs
-            ));
-            Ok(false)
-        }
         (_, KeyCode::Char(c)) if ('1'..='5').contains(&c) => {
             let count = c.to_digit(10).unwrap_or(2);
             player.config_mut().repeat_count = count;

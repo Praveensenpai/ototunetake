@@ -63,13 +63,6 @@ pub fn render_help_modal(frame: &mut Frame) {
             ),
         ]),
         Line::from(vec![
-            Span::styled("  [ / ]        ", Style::default().fg(Theme::PRIMARY)),
-            Span::styled(
-                "Decrease / Increase shadow silence gap (-0.5s / +0.5s)",
-                Style::default().fg(Theme::TEXT),
-            ),
-        ]),
-        Line::from(vec![
             Span::styled("  a            ", Style::default().fg(Theme::PRIMARY)),
             Span::styled(
                 "Toggle Auto-Advance (ON = auto-next sentence, OFF = loop 1 sentence)",

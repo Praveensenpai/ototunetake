@@ -53,7 +53,7 @@ pub fn render_player_card(
 
     render_sentence_text(frame, sentence, config, card_chunks[1]);
     render_progress_bar(frame, player, card_chunks[2]);
-    render_controls_helper(frame, config, card_chunks[4]);
+    render_controls_helper(frame, config, player.effective_shadow_gap(), card_chunks[4]);
     render_metadata(frame, sentence, card_chunks[5]);
 }
 
@@ -238,7 +238,12 @@ fn render_metadata(frame: &mut Frame, sentence: &crate::domain::sentence::Senten
     frame.render_widget(p, area);
 }
 
-fn render_controls_helper(frame: &mut Frame, config: &AppConfig, area: Rect) {
+fn render_controls_helper(
+    frame: &mut Frame,
+    config: &AppConfig,
+    effective_gap: std::time::Duration,
+    area: Rect,
+) {
     let mode_desc = match config.preset {
         crate::domain::config::PlaybackPreset::Shadow => "Listen → Shadow Gap → Replay Check",
         crate::domain::config::PlaybackPreset::Repeat => "Listen → Silence Gap → Listen",
@@ -257,7 +262,7 @@ fn render_controls_helper(frame: &mut Frame, config: &AppConfig, area: Rect) {
     ]);
 
     let rep_str = format!("{}x [keys 1-5]", config.repeat_count);
-    let gap_str = format!("{:.1}s [keys [/]]", config.shadow_gap_secs);
+    let gap_str = format!("{:.1}s (auto)", effective_gap.as_secs_f32());
     let adv_str = if config.auto_advance {
         "ON [key a]"
     } else {

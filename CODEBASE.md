@@ -52,7 +52,7 @@ Sentence Entities (domain::Sentence)
 - **Responsibility**: Player configuration and playback presets.
 - **Types**:
   - `PlaybackPreset`: `Listen`, `Repeat`, `Shadow`.
-  - `AppConfig`: `preset`, `repeat_count`, `shadow_gap_secs`, `pause_after_replay_secs`, `auto_advance`, `show_japanese`, `show_furigana`, `show_translation`, `volume`, `anki_collection_path`, `anki_media_path`.
+  - `AppConfig`: `preset`, `repeat_count`, `pause_after_replay_secs`, `auto_advance`, `show_japanese`, `show_furigana`, `show_translation`, `volume`, `anki_collection_path`, `anki_media_path`.
 
 ### `src/domain/stats.rs` (Role: domain, Lines: 56)
 - **Responsibility**: Practice metrics tracking and daily rollover logic.
