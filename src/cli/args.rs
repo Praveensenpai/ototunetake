@@ -29,7 +29,7 @@ pub struct CliArgs {
 
     #[arg(
         long,
-        help = "Initial preset (listen, repeat, shadow)",
+        help = "Initial preset (shadow, echo, listen)",
         default_value = "shadow"
     )]
     pub mode: String,

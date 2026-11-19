@@ -1,3 +1,4 @@
+use crate::domain::sentence::Sentence;
 use crate::engine::queue::SentenceQueue;
 use crate::ui::theme::Theme;
 use ratatui::{
@@ -29,40 +30,14 @@ pub fn render_queue_view(frame: &mut Frame, queue: &SentenceQueue, area: ratatui
     let inner = block.inner(area);
     frame.render_widget(block, area);
 
-    let mut items = Vec::new();
     let current_idx = queue.cursor();
     let active = queue.active_sentences();
-
     let start = current_idx.saturating_sub(1);
     let end = (current_idx + 12).min(active.len());
 
+    let mut items = Vec::new();
     for (i, sentence) in active.iter().enumerate().take(end).skip(start) {
-        let is_current = i == current_idx;
-
-        let marker = if is_current { "▶ " } else { "  " };
-        let prefix = format!("{}{:3}. ", marker, i + 1);
-
-        let style = if is_current {
-            Style::default()
-                .fg(Theme::PRIMARY)
-                .add_modifier(Modifier::BOLD)
-        } else {
-            Style::default().fg(Theme::TEXT)
-        };
-
-        let tag_summary = if !sentence.tags.is_empty() {
-            format!(" [{}]", sentence.tags[0])
-        } else {
-            String::new()
-        };
-
-        let line = Line::from(vec![
-            Span::styled(prefix, style),
-            Span::styled(&sentence.japanese_text, style),
-            Span::styled(tag_summary, Style::default().fg(Theme::MUTED)),
-        ]);
-
-        items.push(ListItem::new(line));
+        items.push(build_queue_item(i, current_idx, sentence));
     }
 
     if items.is_empty() {
@@ -72,6 +47,33 @@ pub fn render_queue_view(frame: &mut Frame, queue: &SentenceQueue, area: ratatui
         ))));
     }
 
-    let list = List::new(items);
-    frame.render_widget(list, inner);
+    frame.render_widget(List::new(items), inner);
+}
+
+fn build_queue_item(i: usize, current_idx: usize, sentence: &Sentence) -> ListItem<'static> {
+    let is_current = i == current_idx;
+    let marker = if is_current { "▶ " } else { "  " };
+    let prefix = format!("{}{:3}. ", marker, i + 1);
+
+    let style = if is_current {
+        Style::default()
+            .fg(Theme::PRIMARY)
+            .add_modifier(Modifier::BOLD)
+    } else {
+        Style::default().fg(Theme::TEXT)
+    };
+
+    let tag_summary = if !sentence.tags.is_empty() {
+        format!(" [{}]", sentence.tags[0])
+    } else {
+        String::new()
+    };
+
+    let line = Line::from(vec![
+        Span::styled(prefix, style),
+        Span::styled(sentence.japanese_text.clone(), style),
+        Span::styled(tag_summary, Style::default().fg(Theme::MUTED)),
+    ]);
+
+    ListItem::new(line)
 }

@@ -1,44 +1,12 @@
 use crate::domain::config::{AppConfig, PlaybackPreset};
 use crate::domain::stats::PracticeStats;
+pub use crate::engine::phase::{PlaybackStatus, ShadowLoopPhase};
 use crate::engine::queue::SentenceQueue;
 use crate::error::Result;
 use crate::infra::audio::AudioEngine;
 use std::time::{Duration, Instant};
 
-pub const MIN_SHADOW_GAP_SECS: f32 = 3.0;
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum PlaybackStatus {
-    Playing,
-    Replaying,
-    Paused,
-    WaitingGap,
-    Stopped,
-}
-
-#[derive(Debug, Clone)]
-pub enum ShadowLoopPhase {
-    Stopped,
-    PlayingReference {
-        repetition: u32,
-    },
-    ShadowGap {
-        repetition: u32,
-        start: Instant,
-        duration: Duration,
-    },
-    PlayingReplay {
-        repetition: u32,
-    },
-    PostReplayGap {
-        repetition: u32,
-        start: Instant,
-        duration: Duration,
-    },
-    Paused {
-        prev: Box<ShadowLoopPhase>,
-    },
-}
+pub const MIN_ECHO_GAP_SECS: f32 = 2.5;
 
 pub struct ShadowPlayer {
     audio: AudioEngine,
@@ -76,9 +44,9 @@ impl ShadowPlayer {
                     PlaybackStatus::Replaying
                 }
             }
-            ShadowLoopPhase::ShadowGap { .. } | ShadowLoopPhase::PostReplayGap { .. } => {
-                PlaybackStatus::WaitingGap
-            }
+            ShadowLoopPhase::SpeakingGap { .. } => PlaybackStatus::SpeakingGap,
+            ShadowLoopPhase::BreathingGap { .. } => PlaybackStatus::BreathingGap,
+            ShadowLoopPhase::CardCompleteBreak { .. } => PlaybackStatus::CardComplete,
             ShadowLoopPhase::Paused { .. } => PlaybackStatus::Paused,
         }
     }
@@ -86,14 +54,16 @@ impl ShadowPlayer {
     pub fn current_repetition(&self) -> u32 {
         match &self.phase {
             ShadowLoopPhase::PlayingReference { repetition }
-            | ShadowLoopPhase::ShadowGap { repetition, .. }
+            | ShadowLoopPhase::SpeakingGap { repetition, .. }
             | ShadowLoopPhase::PlayingReplay { repetition }
-            | ShadowLoopPhase::PostReplayGap { repetition, .. } => *repetition,
+            | ShadowLoopPhase::BreathingGap { repetition, .. } => *repetition,
+            ShadowLoopPhase::CardCompleteBreak { .. } => self.config.repeat_count,
             ShadowLoopPhase::Paused { prev } => match **prev {
                 ShadowLoopPhase::PlayingReference { repetition }
-                | ShadowLoopPhase::ShadowGap { repetition, .. }
+                | ShadowLoopPhase::SpeakingGap { repetition, .. }
                 | ShadowLoopPhase::PlayingReplay { repetition }
-                | ShadowLoopPhase::PostReplayGap { repetition, .. } => repetition,
+                | ShadowLoopPhase::BreathingGap { repetition, .. } => repetition,
+                ShadowLoopPhase::CardCompleteBreak { .. } => self.config.repeat_count,
                 _ => 1,
             },
             ShadowLoopPhase::Stopped => 1,
@@ -115,6 +85,16 @@ impl ShadowPlayer {
         Ok(())
     }
 
+    pub fn play_reference(&mut self, repetition: u32, queue: &mut SentenceQueue) -> Result<()> {
+        let Some(sentence) = queue.current() else {
+            self.stop();
+            return Ok(());
+        };
+        self.audio.play_file(&sentence.audio_path)?;
+        self.phase = ShadowLoopPhase::PlayingReference { repetition };
+        Ok(())
+    }
+
     pub fn toggle_play(&mut self, queue: &mut SentenceQueue) -> Result<()> {
         match self.phase.clone() {
             ShadowLoopPhase::Stopped => self.play_current(queue),
@@ -122,14 +102,14 @@ impl ShadowPlayer {
                 self.audio.toggle_pause();
                 Ok(())
             }
-            ShadowLoopPhase::ShadowGap { .. } | ShadowLoopPhase::PostReplayGap { .. } => {
-                self.phase = ShadowLoopPhase::Paused {
-                    prev: Box::new(self.phase.clone()),
-                };
+            gap_phase @ (ShadowLoopPhase::SpeakingGap { .. }
+            | ShadowLoopPhase::BreathingGap { .. }
+            | ShadowLoopPhase::CardCompleteBreak { .. }) => {
+                self.phase = gap_phase.pause_countdown();
                 Ok(())
             }
             ShadowLoopPhase::Paused { prev } => {
-                self.phase = *prev;
+                self.phase = prev.resume_from_paused();
                 Ok(())
             }
         }
@@ -157,72 +137,133 @@ impl ShadowPlayer {
     pub fn tick(&mut self, queue: &mut SentenceQueue, stats: &mut PracticeStats) -> Result<()> {
         match self.phase.clone() {
             ShadowLoopPhase::PlayingReference { repetition } => {
-                if self.audio.is_done() {
-                    let is_shadow = self.config.preset == PlaybackPreset::Shadow;
-                    stats.record_playback(self.audio.elapsed().as_secs_f64(), is_shadow);
-                    self.handle_reference_done(repetition, queue, stats)?;
-                }
+                self.check_reference_done(repetition, queue, stats)?;
             }
-            ShadowLoopPhase::ShadowGap {
+            ShadowLoopPhase::SpeakingGap {
                 repetition,
-                start,
-                duration,
+                remaining,
+                started_at,
+                ..
             } => {
-                if start.elapsed() >= duration {
-                    self.start_replay(repetition, queue)?;
-                }
+                self.check_speaking_gap_done(repetition, remaining, started_at, queue)?;
             }
             ShadowLoopPhase::PlayingReplay { repetition } => {
-                if self.audio.is_done() {
-                    self.handle_replay_done(repetition, queue, stats)?;
-                }
+                self.check_replay_done(repetition, queue, stats)?;
             }
-            ShadowLoopPhase::PostReplayGap {
+            ShadowLoopPhase::BreathingGap {
                 repetition,
-                start,
-                duration,
+                remaining,
+                started_at,
+                ..
             } => {
-                if start.elapsed() >= duration {
-                    self.finish_repetition_or_advance(repetition, queue, stats)?;
-                }
+                self.check_breathing_gap_done(repetition, remaining, started_at, queue)?;
+            }
+            ShadowLoopPhase::CardCompleteBreak {
+                remaining,
+                started_at,
+                ..
+            } => {
+                self.check_card_complete_done(remaining, started_at, queue, stats)?;
             }
             ShadowLoopPhase::Stopped | ShadowLoopPhase::Paused { .. } => {}
         }
         Ok(())
     }
 
-    fn handle_reference_done(
+    fn check_reference_done(
         &mut self,
         repetition: u32,
         queue: &mut SentenceQueue,
         stats: &mut PracticeStats,
     ) -> Result<()> {
+        if !self.audio.is_done() {
+            return Ok(());
+        }
+
+        let is_shadow = self.config.preset == PlaybackPreset::Shadow;
+        stats.record_playback(self.audio.elapsed().as_secs_f64(), is_shadow);
+
         match self.config.preset {
-            PlaybackPreset::Listen => self.finish_repetition_or_advance(repetition, queue, stats),
-            PlaybackPreset::Repeat => {
-                let gap = self.effective_shadow_gap();
-                self.phase = ShadowLoopPhase::PostReplayGap {
-                    repetition,
-                    start: Instant::now(),
-                    duration: gap,
-                };
-                Ok(())
-            }
             PlaybackPreset::Shadow => {
-                let gap = self.effective_shadow_gap();
-                self.phase = ShadowLoopPhase::ShadowGap {
+                self.transition_after_shadow_rep(repetition, queue, stats)?;
+            }
+            PlaybackPreset::Echo => {
+                let gap = self.effective_echo_gap();
+                self.phase = ShadowLoopPhase::SpeakingGap {
                     repetition,
-                    start: Instant::now(),
-                    duration: gap,
+                    remaining: gap,
+                    total: gap,
+                    started_at: Instant::now(),
                 };
-                Ok(())
+            }
+            PlaybackPreset::Listen => {
+                self.transition_after_listen_rep(repetition, queue, stats)?;
             }
         }
+        Ok(())
     }
 
-    pub fn effective_shadow_gap(&self) -> Duration {
-        let min = Duration::from_secs_f32(MIN_SHADOW_GAP_SECS);
-        self.audio.duration().max(min)
+    fn transition_after_shadow_rep(
+        &mut self,
+        repetition: u32,
+        _queue: &mut SentenceQueue,
+        _stats: &mut PracticeStats,
+    ) -> Result<()> {
+        if repetition < self.config.repeat_count {
+            let gap = Duration::from_secs_f32(self.config.shadow_breath_gap_secs);
+            self.phase = ShadowLoopPhase::BreathingGap {
+                repetition,
+                remaining: gap,
+                total: gap,
+                started_at: Instant::now(),
+            };
+        } else {
+            let break_gap = Duration::from_secs_f32(self.config.card_complete_break_secs);
+            self.phase = ShadowLoopPhase::CardCompleteBreak {
+                remaining: break_gap,
+                total: break_gap,
+                started_at: Instant::now(),
+            };
+        }
+        Ok(())
+    }
+
+    fn transition_after_listen_rep(
+        &mut self,
+        repetition: u32,
+        _queue: &mut SentenceQueue,
+        _stats: &mut PracticeStats,
+    ) -> Result<()> {
+        if repetition < self.config.repeat_count {
+            let gap = Duration::from_secs_f32(self.config.listen_gap_secs);
+            self.phase = ShadowLoopPhase::BreathingGap {
+                repetition,
+                remaining: gap,
+                total: gap,
+                started_at: Instant::now(),
+            };
+        } else {
+            let break_gap = Duration::from_secs_f32(self.config.card_complete_break_secs);
+            self.phase = ShadowLoopPhase::CardCompleteBreak {
+                remaining: break_gap,
+                total: break_gap,
+                started_at: Instant::now(),
+            };
+        }
+        Ok(())
+    }
+
+    fn check_speaking_gap_done(
+        &mut self,
+        repetition: u32,
+        remaining: Duration,
+        started_at: Instant,
+        queue: &mut SentenceQueue,
+    ) -> Result<()> {
+        if started_at.elapsed() >= remaining {
+            self.start_replay(repetition, queue)?;
+        }
+        Ok(())
     }
 
     fn start_replay(&mut self, repetition: u32, queue: &mut SentenceQueue) -> Result<()> {
@@ -236,52 +277,72 @@ impl ShadowPlayer {
         Ok(())
     }
 
-    fn handle_replay_done(
+    fn check_replay_done(
         &mut self,
         repetition: u32,
-        queue: &mut SentenceQueue,
+        _queue: &mut SentenceQueue,
         stats: &mut PracticeStats,
     ) -> Result<()> {
-        if self.config.pause_after_replay_secs > 0.0 {
-            let post_gap = Duration::from_secs_f32(self.config.pause_after_replay_secs);
-            self.phase = ShadowLoopPhase::PostReplayGap {
-                repetition,
-                start: Instant::now(),
-                duration: post_gap,
-            };
-            Ok(())
-        } else {
-            self.finish_repetition_or_advance(repetition, queue, stats)
+        if !self.audio.is_done() {
+            return Ok(());
         }
+
+        stats.record_playback(self.audio.elapsed().as_secs_f64(), false);
+
+        if repetition < self.config.repeat_count {
+            let gap = Duration::from_secs_f32(self.config.echo_breath_gap_secs);
+            self.phase = ShadowLoopPhase::BreathingGap {
+                repetition,
+                remaining: gap,
+                total: gap,
+                started_at: Instant::now(),
+            };
+        } else {
+            let break_gap = Duration::from_secs_f32(self.config.card_complete_break_secs);
+            self.phase = ShadowLoopPhase::CardCompleteBreak {
+                remaining: break_gap,
+                total: break_gap,
+                started_at: Instant::now(),
+            };
+        }
+        Ok(())
     }
 
-    fn finish_repetition_or_advance(
+    fn check_breathing_gap_done(
         &mut self,
         repetition: u32,
+        remaining: Duration,
+        started_at: Instant,
+        queue: &mut SentenceQueue,
+    ) -> Result<()> {
+        if started_at.elapsed() >= remaining {
+            self.play_reference(repetition + 1, queue)?;
+        }
+        Ok(())
+    }
+
+    fn check_card_complete_done(
+        &mut self,
+        remaining: Duration,
+        started_at: Instant,
         queue: &mut SentenceQueue,
         stats: &mut PracticeStats,
     ) -> Result<()> {
-        if repetition < self.config.repeat_count {
-            let next_rep = repetition + 1;
-            let Some(sentence) = queue.current() else {
-                self.stop();
-                return Ok(());
-            };
-            self.audio.play_file(&sentence.audio_path)?;
-            self.phase = ShadowLoopPhase::PlayingReference {
-                repetition: next_rep,
-            };
-            Ok(())
-        } else {
+        if started_at.elapsed() >= remaining {
             stats.record_sentence_completed();
             if self.config.auto_advance {
                 queue.advance();
-                self.play_current(queue)
+                self.play_current(queue)?;
             } else {
                 self.stop();
-                Ok(())
             }
         }
+        Ok(())
+    }
+
+    pub fn effective_echo_gap(&self) -> Duration {
+        let min = Duration::from_secs_f32(MIN_ECHO_GAP_SECS);
+        self.audio.duration().max(min)
     }
 
     pub fn config(&self) -> &AppConfig {

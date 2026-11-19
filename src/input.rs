@@ -1,3 +1,4 @@
+use crate::domain::config::PlaybackPreset;
 use crate::domain::playlist::PlaylistFilter;
 use crate::engine::player::ShadowPlayer;
 use crate::engine::queue::SentenceQueue;
@@ -18,54 +19,116 @@ pub fn handle_key_event(
         return handle_playlist_key(key, queue, ui_state);
     }
     if ui_state.show_help {
-        if matches!(
-            key.code,
-            KeyCode::Esc | KeyCode::Char('?') | KeyCode::Char('q')
-        ) {
-            ui_state.show_help = false;
-        }
-        return Ok(false);
+        return handle_help_key(key, ui_state);
     }
 
-    match (key.modifiers, key.code) {
-        (KeyModifiers::CONTROL, KeyCode::Char('c')) | (_, KeyCode::Char('q')) => Ok(true),
-        (_, KeyCode::Char(' ')) => {
+    if (key.modifiers == KeyModifiers::CONTROL && key.code == KeyCode::Char('c'))
+        || key.code == KeyCode::Char('q')
+    {
+        return Ok(true);
+    }
+
+    if handle_playback_keys(key.code, player, queue, ui_state)? {
+        return Ok(false);
+    }
+    if handle_config_keys(key.code, player, queue, ui_state) {
+        return Ok(false);
+    }
+    handle_modal_triggers(key.code, queue, ui_state);
+    Ok(false)
+}
+
+fn handle_help_key(key: event::KeyEvent, ui_state: &mut UiState) -> Result<bool> {
+    if matches!(
+        key.code,
+        KeyCode::Esc | KeyCode::Char('?') | KeyCode::Char('q')
+    ) {
+        ui_state.show_help = false;
+    }
+    Ok(false)
+}
+
+fn handle_playback_keys(
+    code: KeyCode,
+    player: &mut ShadowPlayer,
+    queue: &mut SentenceQueue,
+    ui_state: &mut UiState,
+) -> Result<bool> {
+    match code {
+        KeyCode::Char(' ') => {
             if let Err(e) = player.toggle_play(queue) {
                 ui_state.set_status(format!("Audio error: {e}"));
             }
-            Ok(false)
+            Ok(true)
         }
-        (_, KeyCode::Char('n')) | (_, KeyCode::Right) => {
+        KeyCode::Char('n') | KeyCode::Right => {
             if let Err(e) = player.next(queue) {
                 ui_state.set_status(format!("Audio error: {e}"));
             }
-            Ok(false)
+            Ok(true)
         }
-        (_, KeyCode::Char('p')) | (_, KeyCode::Left) => {
+        KeyCode::Char('p') | KeyCode::Left => {
             if let Err(e) = player.previous(queue) {
                 ui_state.set_status(format!("Audio error: {e}"));
             }
-            Ok(false)
+            Ok(true)
         }
-        (_, KeyCode::Char('r')) => {
+        KeyCode::Char('r') => {
             if let Err(e) = player.replay(queue) {
                 ui_state.set_status(format!("Audio error: {e}"));
             }
-            Ok(false)
+            Ok(true)
         }
-        (_, KeyCode::Char('m')) | (_, KeyCode::Tab) => {
+        _ => Ok(false),
+    }
+}
+
+fn handle_config_keys(
+    code: KeyCode,
+    player: &mut ShadowPlayer,
+    queue: &mut SentenceQueue,
+    ui_state: &mut UiState,
+) -> bool {
+    if handle_mode_and_gap_keys(code, player, ui_state) {
+        return true;
+    }
+    if handle_display_and_volume_keys(code, player, ui_state) {
+        return true;
+    }
+    handle_playback_settings_keys(code, player, queue, ui_state)
+}
+
+fn handle_mode_and_gap_keys(
+    code: KeyCode,
+    player: &mut ShadowPlayer,
+    ui_state: &mut UiState,
+) -> bool {
+    match code {
+        KeyCode::Char('m') | KeyCode::Tab => {
             let next_preset = player.config().preset.cycle();
             player.config_mut().preset = next_preset;
             ui_state.set_status(format!("Preset switched to [{}]", next_preset.name()));
-            Ok(false)
+            true
         }
-        (_, KeyCode::Char('s')) => {
-            queue.toggle_shuffle();
-            let state_str = if queue.is_shuffled() { "ON" } else { "OFF" };
-            ui_state.set_status(format!("Shuffle: {state_str}"));
-            Ok(false)
+        KeyCode::Char('[') => {
+            adjust_gap(player, -0.2, ui_state);
+            true
         }
-        (_, KeyCode::Char('t')) => {
+        KeyCode::Char(']') => {
+            adjust_gap(player, 0.2, ui_state);
+            true
+        }
+        _ => false,
+    }
+}
+
+fn handle_display_and_volume_keys(
+    code: KeyCode,
+    player: &mut ShadowPlayer,
+    ui_state: &mut UiState,
+) -> bool {
+    match code {
+        KeyCode::Char('t') => {
             player.config_mut().show_japanese = !player.config().show_japanese;
             let status = if player.config().show_japanese {
                 "Visible"
@@ -73,60 +136,101 @@ pub fn handle_key_event(
                 "Hidden (Audio-First)"
             };
             ui_state.set_status(format!("Japanese text: {status}"));
-            Ok(false)
+            true
         }
-        (_, KeyCode::Char('f')) => {
+        KeyCode::Char('f') => {
             player.config_mut().show_furigana = !player.config().show_furigana;
-            Ok(false)
+            true
         }
-        (_, KeyCode::Char('e')) => {
+        KeyCode::Char('e') => {
             player.config_mut().show_translation = !player.config().show_translation;
-            Ok(false)
+            true
         }
-        (_, KeyCode::Char('+')) | (_, KeyCode::Char('=')) => {
+        KeyCode::Char('+') | KeyCode::Char('=') => {
             let cur = player.audio().volume();
             player.audio_mut().set_volume(cur + 0.05);
             player.config_mut().volume = player.audio().volume();
             ui_state.set_status(format!("Volume: {:.0}%", player.audio().volume() * 100.0));
-            Ok(false)
+            true
         }
-        (_, KeyCode::Char('-')) => {
+        KeyCode::Char('-') => {
             let cur = player.audio().volume();
             player.audio_mut().set_volume(cur - 0.05);
             player.config_mut().volume = player.audio().volume();
             ui_state.set_status(format!("Volume: {:.0}%", player.audio().volume() * 100.0));
-            Ok(false)
+            true
         }
-        (_, KeyCode::Char('a')) => {
+        _ => false,
+    }
+}
+
+fn handle_playback_settings_keys(
+    code: KeyCode,
+    player: &mut ShadowPlayer,
+    queue: &mut SentenceQueue,
+    ui_state: &mut UiState,
+) -> bool {
+    match code {
+        KeyCode::Char('s') => {
+            queue.toggle_shuffle();
+            let state_str = if queue.is_shuffled() { "ON" } else { "OFF" };
+            ui_state.set_status(format!("Shuffle: {state_str}"));
+            true
+        }
+        KeyCode::Char('a') => {
             player.config_mut().auto_advance = !player.config().auto_advance;
             let status = if player.config().auto_advance {
-                "ON (auto-advance to next sentence)"
+                "ON (auto-advance)"
             } else {
                 "OFF (loop current sentence)"
             };
             ui_state.set_status(format!("Auto-advance: {status}"));
-            Ok(false)
+            true
         }
-        (_, KeyCode::Char(c)) if ('1'..='5').contains(&c) => {
+        KeyCode::Char(c) if ('1'..='5').contains(&c) => {
             let count = c.to_digit(10).unwrap_or(2);
             player.config_mut().repeat_count = count;
             ui_state.set_status(format!("Repetitions: {count}x per sentence"));
-            Ok(false)
+            true
         }
-        (_, KeyCode::Char('P')) => {
+        _ => false,
+    }
+}
+
+fn adjust_gap(player: &mut ShadowPlayer, delta: f32, ui_state: &mut UiState) {
+    let preset = player.config().preset;
+    match preset {
+        PlaybackPreset::Shadow => {
+            let new_gap = (player.config().shadow_breath_gap_secs + delta).clamp(0.4, 5.0);
+            player.config_mut().shadow_breath_gap_secs = new_gap;
+            ui_state.set_status(format!("Shadow breath gap: {new_gap:.1}s"));
+        }
+        PlaybackPreset::Echo => {
+            let new_gap = (player.config().echo_breath_gap_secs + delta).clamp(0.4, 5.0);
+            player.config_mut().echo_breath_gap_secs = new_gap;
+            ui_state.set_status(format!("Echo breath gap: {new_gap:.1}s"));
+        }
+        PlaybackPreset::Listen => {
+            let new_gap = (player.config().listen_gap_secs + delta).clamp(0.4, 5.0);
+            player.config_mut().listen_gap_secs = new_gap;
+            ui_state.set_status(format!("Listen spacing gap: {new_gap:.1}s"));
+        }
+    }
+}
+
+fn handle_modal_triggers(code: KeyCode, _queue: &mut SentenceQueue, ui_state: &mut UiState) {
+    match code {
+        KeyCode::Char('P') => {
             ui_state.show_playlists = true;
-            Ok(false)
         }
-        (_, KeyCode::Char('/')) => {
+        KeyCode::Char('/') => {
             ui_state.show_search = true;
             ui_state.search_query.clear();
-            Ok(false)
         }
-        (_, KeyCode::Char('?')) => {
+        KeyCode::Char('?') => {
             ui_state.show_help = true;
-            Ok(false)
         }
-        _ => Ok(false),
+        _ => {}
     }
 }
 
@@ -147,10 +251,7 @@ pub fn handle_search_key(
                 ui_state.set_status("Filter cleared: All Reviewed");
             } else {
                 queue.set_filter(PlaylistFilter::Search(query.clone()));
-                ui_state.set_status(format!(
-                    "Filter applied: Search '{query}' ({} results)",
-                    queue.total()
-                ));
+                ui_state.set_status(format!("Filter: \"{query}\" ({} found)", queue.total()));
             }
         }
         KeyCode::Backspace => {
@@ -170,17 +271,17 @@ pub fn handle_playlist_key(
     ui_state: &mut UiState,
 ) -> Result<bool> {
     match key.code {
-        KeyCode::Esc => {
+        KeyCode::Esc | KeyCode::Char('q') => {
             ui_state.show_playlists = false;
         }
-        KeyCode::Up => {
+        KeyCode::Up | KeyCode::Char('k') => {
             if ui_state.playlist_cursor > 0 {
                 ui_state.playlist_cursor -= 1;
             } else {
                 ui_state.playlist_cursor = ui_state.available_playlists.len().saturating_sub(1);
             }
         }
-        KeyCode::Down => {
+        KeyCode::Down | KeyCode::Char('j') => {
             if ui_state.playlist_cursor + 1 < ui_state.available_playlists.len() {
                 ui_state.playlist_cursor += 1;
             } else {
@@ -188,17 +289,9 @@ pub fn handle_playlist_key(
             }
         }
         KeyCode::Enter => {
-            if let Some(selected) = ui_state
-                .available_playlists
-                .get(ui_state.playlist_cursor)
-                .cloned()
-            {
-                queue.set_filter(selected.clone());
-                ui_state.set_status(format!(
-                    "Loaded playlist: {} ({} sentences)",
-                    selected.name(),
-                    queue.total()
-                ));
+            if let Some(pl) = ui_state.available_playlists.get(ui_state.playlist_cursor) {
+                queue.set_filter(pl.clone());
+                ui_state.set_status(format!("Switched to: {}", pl.name()));
             }
             ui_state.show_playlists = false;
         }

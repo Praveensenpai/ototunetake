@@ -59,7 +59,7 @@ fn apply_cli_overrides(args: &CliArgs, config: &mut AppConfig) {
     }
     match args.mode.to_lowercase().as_str() {
         "listen" => config.preset = PlaybackPreset::Listen,
-        "repeat" => config.preset = PlaybackPreset::Repeat,
+        "echo" | "repeat" => config.preset = PlaybackPreset::Echo,
         "shadow" => config.preset = PlaybackPreset::Shadow,
         _ => {}
     }
@@ -195,16 +195,27 @@ fn main_loop(
             ui_state.set_status(format!("Audio error: {e}"));
         }
 
-        if event::poll(tick_rate)? {
-            if let Event::Key(key) = event::read()? {
-                if input::handle_key_event(key, player, queue, ui_state)? {
-                    break;
-                }
-            }
+        if poll_and_handle_event(player, queue, ui_state, tick_rate)? {
+            break;
         }
     }
 
     Ok(())
+}
+
+fn poll_and_handle_event(
+    player: &mut ShadowPlayer,
+    queue: &mut SentenceQueue,
+    ui_state: &mut UiState,
+    tick_rate: Duration,
+) -> Result<bool> {
+    if !event::poll(tick_rate)? {
+        return Ok(false);
+    }
+    if let Event::Key(key) = event::read()? {
+        return input::handle_key_event(key, player, queue, ui_state);
+    }
+    Ok(false)
 }
 
 fn persist_session(

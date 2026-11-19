@@ -195,17 +195,8 @@ impl AnkiScanner {
                 .unwrap_or_default();
             let cleaned = Self::strip_html(val);
 
-            if Self::is_sound_field(val) {
-                if let Some(sound) = Self::extract_sound_filename(val) {
-                    let prio = if name.contains("sent") || name.contains("expression") {
-                        2
-                    } else if name.contains("vocab") || name.contains("word") {
-                        1
-                    } else {
-                        0
-                    };
-                    audio_candidates.push((prio, sound));
-                }
+            if let Some(candidate) = Self::check_audio_field(val, &name) {
+                audio_candidates.push(candidate);
             }
 
             if name.contains("furigana") || name.contains("reading") {
@@ -225,6 +216,21 @@ impl AnkiScanner {
         let audio_file = audio_candidates.into_iter().next()?.1;
 
         Some((japanese_text, furigana, translation, audio_file))
+    }
+
+    fn check_audio_field(val: &str, field_name: &str) -> Option<(u8, String)> {
+        if !Self::is_sound_field(val) {
+            return None;
+        }
+        let sound = Self::extract_sound_filename(val)?;
+        let prio = if field_name.contains("sent") || field_name.contains("expression") {
+            2
+        } else if field_name.contains("vocab") || field_name.contains("word") {
+            1
+        } else {
+            0
+        };
+        Some((prio, sound))
     }
 
     fn strip_html(input: &str) -> String {

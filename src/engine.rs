@@ -1,5 +1,7 @@
+pub mod phase;
 pub mod player;
 pub mod queue;
 
-pub use player::{PlaybackStatus, ShadowLoopPhase, ShadowPlayer};
+pub use phase::{PlaybackStatus, ShadowLoopPhase};
+pub use player::ShadowPlayer;
 pub use queue::SentenceQueue;

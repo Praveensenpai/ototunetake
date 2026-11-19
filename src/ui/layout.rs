@@ -12,18 +12,15 @@ pub fn create_main_layout(area: Rect) -> Vec<Rect> {
     let vertical_chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
-            Constraint::Length(5), // Header
-            Constraint::Min(12),   // Body
-            Constraint::Length(2), // Footer
+            Constraint::Length(5),
+            Constraint::Min(12),
+            Constraint::Length(2),
         ])
         .split(area);
 
     let body_chunks = Layout::default()
         .direction(Direction::Horizontal)
-        .constraints([
-            Constraint::Percentage(60), // Player Card
-            Constraint::Percentage(40), // Queue View
-        ])
+        .constraints([Constraint::Percentage(60), Constraint::Percentage(40)])
         .split(vertical_chunks[1]);
 
     vec![
@@ -48,6 +45,8 @@ pub fn render_footer(frame: &mut Frame, ui_state: &UiState, area: Rect) {
             Span::styled(" Reps ", Style::default().fg(Theme::MUTED)),
             Span::styled(" [m]", Style::default().fg(Theme::SECONDARY)),
             Span::styled(" Mode ", Style::default().fg(Theme::MUTED)),
+            Span::styled(" [[/]]", Style::default().fg(Theme::SECONDARY)),
+            Span::styled(" Gap ", Style::default().fg(Theme::MUTED)),
             Span::styled(" [a]", Style::default().fg(Theme::SECONDARY)),
             Span::styled(" Auto-Adv ", Style::default().fg(Theme::MUTED)),
             Span::styled(" [t]", Style::default().fg(Theme::SECONDARY)),

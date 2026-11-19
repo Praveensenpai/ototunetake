@@ -19,7 +19,7 @@
 ```text
 ┌────────────────────────────────────────────────────────────────────────┐
 │  🌸 Ototunetake ── Japanese Shadowing Player                           │
-│  Status: [ ▶ PLAYING ]   [SHADOW]   Rep 1/2  •  Gap: 3.0s  •  Vol: 100% │
+│  Status: [ 🗣 SHADOWING ]  [SHADOW]   Rep 1/2  •  Gap: 1.2s  •  Vol: 100%│
 │  Sentence 12 of 756 (All Reviewed)  │  Today: 42 sent (28m, 84 reps)   │
 ├────────────────────────────────────────┬───────────────────────────────┤
 │ 🎧 Japanese Shadowing Player           │ 📋 Queue  [SEQUENTIAL]        │
@@ -29,15 +29,15 @@
 │  I know hiragana. I understand hiragana│    14. 明日は休みだよ。        │
 │                                        │    15. コーヒーを飲みます。     │
 │ [====================================] │    16. 映画を見に行きました。   │
-│       ▶ Reference Audio: 0.8s / 1.6s   │    17. これはいくらですか？    │
+│       🗣 Shadow Along: 0.8s / 1.6s     │    17. これはいくらですか？    │
 │                                        │    18. 駅はどこですか？        │
-│  Mode [m]: SHADOW (Listen → Gap → Repl)│    19. 日本語を勉強しています。 │
-│  Reps: 2x [keys 1-5] │ Gap: 3.0s (auto)│    20. 今日は天気がいいね。    │
+│  Mode [m]: SHADOW (Concurrent Shadow)  │    19. 日本語を勉強しています。 │
+│  Reps: 2x [keys 1-5] │ Gap: 1.2s [[/]] │    20. 今日は天気がいいね。    │
 │  Deck: Ankidrone V7  │ Tags: jp1k      │                               │
 │  Status: Mature (49d)│ Reps: 14        │                               │
 ├────────────────────────────────────────┴───────────────────────────────┤
-│ [Space] Play  [1-5] Reps  [m] Mode  [a] Auto-Adv  [t] Text  [n/p] Nav   │
-│ [r] Replay  [s] Shuffle  [P] Playlists  [/] Search  [?] Help            │
+│ [Space] Play  [1-5] Reps  [m] Mode  [[/]] Gap  [a] Auto-Adv  [t] Text   │
+│ [n/p] Nav  [r] Replay  [s] Shuffle  [P] Playlists  [/] Search  [?] Help │
 └────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -62,29 +62,31 @@ It **never** regenerates, downloads, scrapes, or synthesizes audio. It discovers
 
 Switch between modes anytime by pressing **`m`** (or `Tab`):
 
-### 1. `SHADOW` Mode (Default & Recommended)
-The ultimate deliberate practice loop for pitch accent and pronunciation:
+### 1. `SHADOW` Mode (Default & Authentic Shadowing)
+The gold standard for muscle memory, pitch accent, and pronunciation:
 ```text
-Native Audio (Listen) ──► Silence Gap (You Shadow) ──► Replay Audio (Self-Correction Check) ──► Repeat N times ──► Auto-Advance
+Native Audio (You Shadow Concurrently) ──► Breathing Gap (1.2s) ──► Repeat N times ──► Card Complete Break (2.0s) ──► Auto-Advance
 ```
-1. **Listen**: The native reference sentence audio plays once.
-2. **Shadow Gap**: An automated silence gap (dynamically set to the reference audio length, minimum 3.0s) begins, giving you time to repeat the sentence aloud.
-3. **Replay Check**: The native reference audio automatically plays again so you can verify your pitch accent and pronunciation against the native speaker.
-4. **Repetition Loop**: Repeats this cycle $N$ times (configured via keys `1`–`5`) before auto-advancing to the next sentence.
+1. **Concurrent Shadowing**: The native reference audio plays, and you speak simultaneously with a 0.2s–0.5s lag behind the speaker.
+2. **Breathing Gap**: A brief 1.2s vocal reset pause before repetition 2, 3, etc.
+3. **Card Complete Break**: After all repetitions for the card finish, a 2.0s calming reset break allows your brain to digest the sentence before the next card loads.
 
-### 2. `REPEAT` Mode
-A rapid-fire repetition loop without the post-replay check:
+### 2. `ECHO` Mode (Call & Response / Repeat After Me)
+Ideal for memory retrieval and verifying pronunciation:
 ```text
-Native Audio ──► Silence Gap ──► Native Audio ──► Silence Gap ──► Auto-Advance
+Native Audio (Listen) ──► Speaking Gap (Repeat Aloud) ──► Replay Check (Self-Correction) ──► Breathing Gap (1.0s) ──► Repeat N times ──► Auto-Advance
 ```
-Ideal when you already know the pronunciation well and want quick, repeated repetitions.
+1. **Listen**: Hear the sentence once from the native speaker.
+2. **Speaking Gap**: A full silence gap (sentence length, $\ge 2.5$s) where the gauge says `🗣 Your Turn (Echo)` to reproduce the sentence from memory.
+3. **Replay Check**: Native audio plays once more to verify your recall and pitch against the speaker.
+4. **Breathing Gap**: 1.0s pause before the next repetition or card.
 
-### 3. `LISTEN` Mode
-Pure continuous native audio stream across sentences without pauses or gaps:
+### 3. `LISTEN` Mode (Continuous Immersion)
+Pure continuous native audio stream across sentences with natural spacing:
 ```text
-Sentence 1 ──► Sentence 2 ──► Sentence 3 ──► Sentence 4 ...
+Sentence 1 ──► Natural Spacing Gap (1.2s) ──► Sentence 2 ──► Natural Spacing Gap (1.2s) ──► Sentence 3 ...
 ```
-Ideal for background immersion, passive listening, walking, or resting your voice.
+Ideal for background immersion, passive listening, walking, or resting your voice without sentences colliding abruptly.
 
 ---
 
@@ -93,9 +95,11 @@ Ideal for background immersion, passive listening, walking, or resting your voic
 The on-screen player card and footer show your live settings at a glance:
 
 - **Repetition Count (`1` – `5`)**:
-  Press numbers `1`, `2`, `3`, `4`, or `5` to immediately change how many times each sentence is practiced before advancing.
-- **Adaptive Shadow Gap (Automatic)**:
-  Dynamically calculates the speaking silence gap based on sentence audio length (minimum `3.0s`), ensuring natural pacing without manual adjustment.
+  Press numbers `1`, `2`, `3`, `4`, or `5` to change how many times each sentence is practiced before advancing.
+- **Breathing & Rest Gaps (`[` and `]`)**:
+  Press `[` to decrease or `]` to increase the active breathing/rest gap by `0.2s` on the fly.
+- **Card Complete Break (Automatic)**:
+  After completing all configured repetitions of a card, a 2.0s gold status break (`🎉 Card Complete`) provides cognitive reset before loading the next card.
 - **Auto-Advance Toggle (`a`)**:
   - When **ON**, the player automatically transitions to the next sentence when repetitions finish.
   - When **OFF**, the player pauses after the current sentence so you can practice at your own pace.

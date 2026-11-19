@@ -12,9 +12,9 @@ Sentence Entities (domain::Sentence)
   │
   ├─► SentenceQueue (Filter, Shuffle, Nav)
   │
-  ├─► ShadowPlayer State Machine (Reference Audio ─► Shadow Gap ─► Replay ─► Advance)
+  ├─► ShadowPlayer State Machine (Reference Audio ─► Breathing Gap / Speaking Gap ─► Card Complete Break)
   │     │
-  │     ├─► AudioEngine (rodio native playback)
+  │     ├─► AudioEngine (rodio native playback + ffmpeg FLAC fallback)
   │     └─► PracticeStats (Session & daily persistence)
   │
   └─► Ratatui TUI (Header, PlayerCard, QueueView, Modals)
@@ -48,18 +48,18 @@ Sentence Entities (domain::Sentence)
   - `PlaylistFilter`: `AllReviewed`, `Mature`, `Young`, `RecentlyReviewed`, `Deck(String)`, `Tag(String)`, `Search(String)`.
   - `Playlist`: `name: String`, `filter: PlaylistFilter`.
 
-### `src/domain/config.rs` (Role: domain, Lines: 60)
+### `src/domain/config.rs` (Role: domain, Lines: 75)
 - **Responsibility**: Player configuration and playback presets.
 - **Types**:
-  - `PlaybackPreset`: `Listen`, `Repeat`, `Shadow`.
-  - `AppConfig`: `preset`, `repeat_count`, `pause_after_replay_secs`, `auto_advance`, `show_japanese`, `show_furigana`, `show_translation`, `volume`, `anki_collection_path`, `anki_media_path`.
+  - `PlaybackPreset`: `Shadow`, `Echo`, `Listen`.
+  - `AppConfig`: `preset`, `repeat_count`, `pause_after_replay_secs`, `auto_advance`, `show_japanese`, `show_furigana`, `show_translation`, `volume`, `anki_collection_path`, `anki_media_path`, `shadow_breath_gap_secs`, `echo_breath_gap_secs`, `card_complete_break_secs`, `listen_gap_secs`.
 
 ### `src/domain/stats.rs` (Role: domain, Lines: 56)
 - **Responsibility**: Practice metrics tracking and daily rollover logic.
 - **Types**:
   - `PracticeStats`: `total_listened_count`, `total_shadowed_count`, `total_listening_secs`, `today_date`, `today_sentences_count`, `today_repetitions_count`, `today_listening_secs`.
 
-### `src/infra/anki.rs` (Role: infra, Lines: 277)
+### `src/infra/anki.rs` (Role: infra, Lines: 275)
 - **Responsibility**: Read-only SQLite Anki collection inspection and media file resolver.
 - **Types**:
   - `AnkiPaths`: `collection_db: PathBuf`, `media_dir: PathBuf`.
@@ -77,30 +77,34 @@ Sentence Entities (domain::Sentence)
   - `SessionState`: `last_sentence_id`, `playlist_name`, `volume`, `shuffle`.
   - `AppStorage`: `new() -> Result<Self>`, `load_config() -> AppConfig`, `save_config()`, `load_stats() -> PracticeStats`, `save_stats()`, `load_session() -> SessionState`, `save_session()`.
 
+### `src/engine/phase.rs` (Role: engine, Lines: 130)
+- **Responsibility**: Loop phase definitions and pause/resume duration preservation.
+- **Types**:
+  - `PlaybackStatus`: `Playing`, `Replaying`, `Paused`, `SpeakingGap`, `BreathingGap`, `CardComplete`, `Stopped`.
+  - `ShadowLoopPhase`: `Stopped`, `PlayingReference`, `SpeakingGap`, `PlayingReplay`, `BreathingGap`, `CardCompleteBreak`, `Paused`.
+
 ### `src/engine/queue.rs` (Role: engine, Lines: 161)
 - **Responsibility**: Active sentence queue, playlist filtering, and cursor navigation.
 - **Types**:
   - `SentenceQueue`: `new(pool: Vec<Sentence>) -> Self`, `current()`, `advance()`, `previous()`, `jump_to()`, `toggle_shuffle()`, `set_filter()`, `remove_at()`.
 
-### `src/engine/player.rs` (Role: engine, Lines: 295)
-- **Responsibility**: Multi-phase Shadowing loop state machine and repetition controller.
+### `src/engine/player.rs` (Role: engine, Lines: 330)
+- **Responsibility**: Multi-phase Shadowing and Echo loop controller and auto-advancer.
 - **Types**:
-  - `PlaybackStatus`: `Playing`, `Replaying`, `Paused`, `WaitingGap`, `Stopped`.
-  - `ShadowLoopPhase`: `Stopped`, `PlayingReference`, `ShadowGap`, `PlayingReplay`, `PostReplayGap`, `Paused`.
   - `ShadowPlayer`: `new()`, `phase()`, `status()`, `current_repetition()`, `play_current()`, `toggle_play()`, `replay()`, `next()`, `previous()`, `tick()`.
 
-### `src/input.rs` (Role: ui/input, Lines: 216)
-- **Responsibility**: Keyboard event dispatcher and modal input handlers with non-crashing status notifications.
+### `src/input.rs` (Role: ui/input, Lines: 250)
+- **Responsibility**: Modular keyboard event dispatcher, volume/gap adjustments (`[` / `]`), and modal input handlers.
 - **Functions**: `handle_key_event`, `handle_search_key`, `handle_playlist_key`.
 
 ### `src/ui/` (Role: ui)
 - `theme.rs` (Lines: 13): Pastel palette matching Ototune aesthetic.
 - `layout.rs` (Lines: 70): Split layout and bottom keybinding hints.
-- `header.rs` (Lines: 132): Header with playback badges, preset status, repetition counter, and today's stats.
-- `player_card.rs` (Lines: 258): Audio-first sentence display, phase-aware gauge progress with live timing, card review metadata.
-- `queue_view.rs` (Lines: 77): Upcoming queue list and active item highlight.
-- `modals.rs` (Lines: 242): Help modal (`?`), playlist selector (`P`), live search bar (`/`).
+- `header.rs` (Lines: 155): Header with playback badges, preset status, repetition counter, and today's stats.
+- `player_card.rs` (Lines: 285): Audio-first sentence display, phase-aware gauge progress with live timing, card review metadata.
+- `queue_view.rs` (Lines: 75): Upcoming queue list and active item highlight.
+- `modals.rs` (Lines: 250): Help modal (`?`), playlist selector (`P`), live search bar (`/`).
 
 ### `src/cli/args.rs` (Role: cli, Lines: 42)
-- **Responsibility**: Clap CLI definitions for collection path, deck/tag filters, mode, and shuffle.
+- **Responsibility**: Clap CLI definitions for collection path, deck/tag filters, mode (`shadow`, `echo`, `listen`), and shuffle.
 - **Types**: `CliArgs`.

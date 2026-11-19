@@ -9,7 +9,7 @@ use ratatui::{
 };
 
 pub fn render_help_modal(frame: &mut Frame) {
-    let area = centered_rect(70, 80, frame.area());
+    let area = centered_rect(70, 85, frame.area());
     frame.render_widget(Clear, area);
 
     let block = Block::default()
@@ -26,9 +26,22 @@ pub fn render_help_modal(frame: &mut Frame) {
     let inner = block.inner(area);
     frame.render_widget(block, area);
 
-    let help_lines = vec![
+    let mut help_lines = Vec::new();
+    help_lines.extend(build_core_controls_help());
+    help_lines.extend(build_mode_and_gap_help());
+    help_lines.push(Line::from(""));
+    help_lines.extend(build_display_help());
+    help_lines.push(Line::from(""));
+    help_lines.extend(build_nav_help());
+
+    let p = Paragraph::new(help_lines).wrap(Wrap { trim: true });
+    frame.render_widget(p, inner);
+}
+
+fn build_core_controls_help() -> Vec<Line<'static>> {
+    vec![
         Line::from(vec![Span::styled(
-            "Playback & Loop Controls:",
+            "Playback Controls:",
             Style::default()
                 .fg(Theme::SECONDARY)
                 .add_modifier(Modifier::BOLD),
@@ -36,7 +49,7 @@ pub fn render_help_modal(frame: &mut Frame) {
         Line::from(vec![
             Span::styled("  Space        ", Style::default().fg(Theme::PRIMARY)),
             Span::styled(
-                "Play / Pause audio & active shadowing loop",
+                "Play / Pause audio & active loop without timer drift",
                 Style::default().fg(Theme::TEXT),
             ),
         ]),
@@ -58,21 +71,33 @@ pub fn render_help_modal(frame: &mut Frame) {
         Line::from(vec![
             Span::styled("  1 - 5        ", Style::default().fg(Theme::PRIMARY)),
             Span::styled(
-                "Set repeat count (repeats each sentence 1 to 5 times)",
+                "Set repetition count (1 to 5 times per sentence)",
+                Style::default().fg(Theme::TEXT),
+            ),
+        ]),
+    ]
+}
+
+fn build_mode_and_gap_help() -> Vec<Line<'static>> {
+    vec![
+        Line::from(vec![
+            Span::styled("  m / Tab      ", Style::default().fg(Theme::PRIMARY)),
+            Span::styled(
+                "Cycle preset: [Shadow] -> [Echo] -> [Listen]",
+                Style::default().fg(Theme::TEXT),
+            ),
+        ]),
+        Line::from(vec![
+            Span::styled("  [ / ]        ", Style::default().fg(Theme::PRIMARY)),
+            Span::styled(
+                "Adjust breathing / rest gap by -0.2s / +0.2s",
                 Style::default().fg(Theme::TEXT),
             ),
         ]),
         Line::from(vec![
             Span::styled("  a            ", Style::default().fg(Theme::PRIMARY)),
             Span::styled(
-                "Toggle Auto-Advance (ON = auto-next sentence, OFF = loop 1 sentence)",
-                Style::default().fg(Theme::TEXT),
-            ),
-        ]),
-        Line::from(vec![
-            Span::styled("  m / Tab      ", Style::default().fg(Theme::PRIMARY)),
-            Span::styled(
-                "Cycle preset: [Shadow] -> [Repeat] -> [Listen]",
+                "Toggle Auto-Advance (ON = auto-next, OFF = loop 1 sentence)",
                 Style::default().fg(Theme::TEXT),
             ),
         ]),
@@ -87,9 +112,13 @@ pub fn render_help_modal(frame: &mut Frame) {
             Span::styled("  + / -        ", Style::default().fg(Theme::PRIMARY)),
             Span::styled("Adjust volume", Style::default().fg(Theme::TEXT)),
         ]),
-        Line::from(""),
+    ]
+}
+
+fn build_display_help() -> Vec<Line<'static>> {
+    vec![
         Line::from(vec![Span::styled(
-            "Display & Learning Options:",
+            "Display & Audio-First Options:",
             Style::default()
                 .fg(Theme::SECONDARY)
                 .add_modifier(Modifier::BOLD),
@@ -115,7 +144,11 @@ pub fn render_help_modal(frame: &mut Frame) {
                 Style::default().fg(Theme::TEXT),
             ),
         ]),
-        Line::from(""),
+    ]
+}
+
+fn build_nav_help() -> Vec<Line<'static>> {
+    vec![
         Line::from(vec![Span::styled(
             "Navigation & Modals:",
             Style::default()
@@ -145,12 +178,12 @@ pub fn render_help_modal(frame: &mut Frame) {
         ]),
         Line::from(vec![
             Span::styled("  q / Ctrl+C   ", Style::default().fg(Theme::MUTED)),
-            Span::styled("Save state and quit", Style::default().fg(Theme::TEXT)),
+            Span::styled(
+                "Save session state and quit",
+                Style::default().fg(Theme::TEXT),
+            ),
         ]),
-    ];
-
-    let p = Paragraph::new(help_lines).wrap(Wrap { trim: true });
-    frame.render_widget(p, inner);
+    ]
 }
 
 pub fn render_playlist_modal(frame: &mut Frame, ui_state: &UiState) {
